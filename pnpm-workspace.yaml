@@ -32,6 +32,9 @@ peerDependencyRules:
 allowBuilds:
   esbuild: true
   lefthook: true
+  # The dsh-desktop shell's runtime binary: the postinstall downloads the
+  # matching Electron distribution (no source build).
+  electron: true
   # Cross-platform boundary for the persistent PTY backend, including ConPTY on Windows.
   node-pty: true
   # Pulled in by @earendil-works/pi-ai (optional LLM API backend). pnpm lists
