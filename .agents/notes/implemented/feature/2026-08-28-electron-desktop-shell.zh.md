@@ -26,6 +26,10 @@ dsh 的交互表面是浏览器 UI：`dsh web` 在 127.0.0.1 上服务 React 应
 
 `scripts/install-app.ts` 让外壳像已安装的程序一样可达：它创建名为 `dsh` 的开始菜单与桌面快捷方式，二者都以检出里的 `electron.exe` 为目标、以应用目录为唯一参数，以随附的 `assets/dsh.ico`（品牌渐变底上的 favicon 鲸鱼）为图标，BrowserWindow 也使用同一图标。快捷方式落在用户自己的 Programs 与 Desktop 文件夹，因此 `Get-StartApps`、开始菜单搜索（Win+S）与桌面图标都能呈现该应用，无需安装器或管理员权限；`--remove` 删除它们。该注册指向检出目录，产物重建后由 `pnpm run desktop:install` 重新创建。
 
+### 外壳表面：浏览器交接、菜单栏与品牌
+
+子进程带 `--no-open` 运行，web runtime 的默认浏览器交接保持关闭，服务出的页面只出现在窗口内；需要浏览器标签时用 文件 菜单的 在浏览器中打开 把当前 URL 交给系统浏览器。菜单栏采用编辑器标准的 文件/编辑/选择/查看/窗口/帮助 集合：侧栏命令（新建会话、打开设置、切换侧栏）通过 CSS-module 词干匹配驱动服务 UI 自己的控件，行为不会与页面漂移；缩放则在 `before-input-event` 里按物理键（`=`、`+`、小键盘加号）映射——Electron 内置 zoomIn role 只绑 `Plus`，而普通 `Ctrl++` 永远产生不了它。产品名是数据不是代码：侧栏品牌与窗口标题都回退到 `brand.localBuild` 文案，部署改名只需编辑 locale，侧栏测试钉住该文案。
+
 ### 仓库集成
 
 该 app 与 `apps/cli` 一样是 release member（可发布 manifest、加入 workspace 约束门禁的 `files` 策略），以包内捆绑配置加入 host TypeScript face 与 root tsdown workspace，并且不携带 renderer preload：沙箱化的 preload 只支持 CJS，ESM 外壳的占位 preload 只会崩溃而不是占位。`electron` 仅是该 app 的 devDependency；其他 workspace 都不导入它，覆盖率门禁也保持只扫 packages。

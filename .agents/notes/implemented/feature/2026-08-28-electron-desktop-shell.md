@@ -26,6 +26,10 @@ Window geometry persists to `window-bounds.json` under Electron's userData direc
 
 `scripts/install-app.ts` makes the shell reachable like an installed program: it creates a Start Menu and a desktop shortcut named `dsh`, each pointing at the checkout's `electron.exe` with the app directory as the single argument, the shipped `assets/dsh.ico` (the favicon whale on a brand-gradient tile) as the icon, and the same icon on the BrowserWindow. The shortcuts live in the user's own Programs and Desktop folders, so `Get-StartApps`, start-menu search (Win+S), and the desktop icon all surface the app without an installer or admin rights; `--remove` deletes them. The registration points into the checkout and is re-created by `pnpm run desktop:install` after the artifacts rebuild.
 
+### Shell surface: browser handoff, menu bar, and brand
+
+The child runs with `--no-open`, so the web runtime's default-browser handoff stays off and the served page appears only inside the window; the 文件 menu's 在浏览器中打开 hands the current URL to the OS browser on demand. The menu bar models the editor-standard 文件/编辑/选择/查看/窗口/帮助 set: sidebar commands (新建会话, 打开设置, 切换侧栏) drive the served UI's own controls through CSS-module stem matching, so their behavior cannot drift from the page, while zoom maps from the physical key (`=`, `+`, numpad add) in `before-input-event` — Electron's built-in zoomIn role binds only `Plus`, which a plain `Ctrl++` never produces. The product name is data, not code: the sidebar brand and the window title both fall back to the `brand.localBuild` locale strings, so a deployment renames the shell by editing the locale, and the sidebar tests pin that copy.
+
 ### Repository integration
 
 The app is a release member like `apps/cli` (publishable manifest, `files` policy added to the workspace-constraint gate), joins the host TypeScript face and the root tsdown workspace with a package-local bundle config, and ships no renderer preload: sandboxed preloads are CJS-only, so an ESM-shell stub preload would be a crash, not a placeholder. `electron` is a devDependency of this app alone; no other workspace imports it, and the coverage gate stays packages-scoped.

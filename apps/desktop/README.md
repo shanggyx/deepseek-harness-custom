@@ -31,13 +31,14 @@ It is a different launch path over the same UI. `npx @deepseek-ai/dsh web` runs 
 
 | Aspect | Contract |
 |---|---|
-| Port | The child runs `dsh web --port 0`; the OS picks a free port and the shell reads it from the readiness line. |
+| Port | The child runs `dsh web --port 0 --no-open`; the OS picks a free port, the shell reads it from the readiness line, and the page appears only in the desktop window (the 文件 menu has 在浏览器中打开 for a browser tab). |
+| Menu bar | Editor-style 文件/编辑/选择/查看/窗口/帮助: 新建会话 `Ctrl+N`, 打开设置 `Ctrl+,`, zoom `Ctrl+=` / `Ctrl+-` / `Ctrl+0`, 切换侧栏 `Ctrl+B`, reload and developer tools. |
 | Single instance | A second launch (shortcut or command) focuses the first window instead of spawning a second dsh runtime. |
 | Process tree | Closing the window or quitting kills the child's whole process tree (`taskkill /T /F` on Windows). |
 | Child exit | A dsh process that exits on its own shows an error dialog and closes the shell. |
 | Window geometry | Size and position persist to `window-bounds.json` under Electron's userData directory, re-validated against the current display on load. |
 | Resize | The three-column web layout already adapts to the viewport; the window adds only `minWidth`/`minHeight`. |
-| Zoom | The stock View menu roles provide reset/in/out zoom and developer tools. |
+| Brand | The sidebar name and window title come from the locale string `brand.localBuild` in [`packages/client/locale/src/locales/`](../../packages/client/locale/src/locales/). |
 
 ## Environment overrides
 

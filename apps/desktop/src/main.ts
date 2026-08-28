@@ -10,7 +10,7 @@
 
 /* v8 ignore file -- the process-bound shell is exercised by launching the app. */
 
-import { app, BrowserWindow, Menu, dialog, screen } from 'electron'
+import { app, BrowserWindow, Menu, dialog, screen, shell, type MenuItemConstructorOptions } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -40,12 +40,14 @@ const PROFILE = 'web'
  * The launcher invocation. The default runs the repository from source — the
  * same entry the root `pnpm dsh` script uses, resolved against the checkout
  * this shell sits in — and the environment overrides re-target both halves
- * for a packaged shell.
+ * for a packaged shell. `--no-open` keeps the served page inside this window:
+ * without it the web runtime also hands the URL to the default browser, which
+ * would open a second surface beside the shell.
  */
 function dshLaunch(): { command: string; args: string[] } {
   const command = process.env[NODE_EXECUTABLE_ENV] ?? 'node'
   const entry = process.env[LAUNCHER_ENTRY_ENV] ?? 'apps/cli/src/bin.ts'
-  return { command, args: ['--import', 'tsx/esm', entry, PROFILE, '--port', '0'] }
+  return { command, args: ['--import', 'tsx/esm', entry, PROFILE, '--port', '0', '--no-open'] }
 }
 
 /** The repository checkout the shell drives: apps/desktop sits two levels under it. */
@@ -178,13 +180,139 @@ function focusWindow(): void {
   window.focus()
 }
 
-/** Install the stock role menu: zoom, reload, and devtools without hand-maintained accelerators. */
+/** The window a menu command acts on: the focused one, else the only window. */
+function activeWindow(): BrowserWindow | undefined {
+  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+}
+
+/**
+ * Click a control inside the served UI. The web app exposes its sidebar
+ * controls as plain buttons whose CSS-module class names keep stable stems,
+ * so menu commands drive them through stem matching instead of hard-coding
+ * translated labels.
+ */
+function clickInRenderer(selector: string): void {
+  void activeWindow()?.webContents.executeJavaScript(
+    `document.querySelector(${JSON.stringify(selector)})?.click()`,
+    true,
+  )
+}
+
+/** One zoom step in webContents zoom-level units; 0 means "reset to 100%". */
+const ZOOM_STEP = 0.5
+
+/** Apply a zoom step (or a reset) to the window the menu or shortcut targets. */
+function applyZoom(window: BrowserWindow | undefined, step: number): void {
+  if (window === undefined) return
+  const contents = window.webContents
+  contents.setZoomLevel(step === 0 ? 0 : contents.getZoomLevel() + step)
+}
+
+/**
+ * The Ctrl/ Cmd zoom family, resolved from one physical-key event: `=`, `+`
+ * (Shift+=), and the numpad add key all zoom in. Electron's built-in zoomIn
+ * role only binds `Plus`, which a plain Ctrl++ never produces, so the shell
+ * owns the mapping here instead of in menu accelerators.
+ */
+function zoomStepForKey(input: { control: boolean; meta: boolean; key: string; code: string }): number | undefined {
+  const zoomHeld = input.control || input.meta
+  if (!zoomHeld) return undefined
+  if (input.key === '=' || input.key === '+' || input.code === 'NumpadAdd') return ZOOM_STEP
+  if (input.key === '-' || input.code === 'NumpadSubtract') return -ZOOM_STEP
+  if (input.key === '0') return 0
+  return undefined
+}
+
+/** The zoom entry shared by the menu item and the physical-key mapping. */
+function zoomMenuItem(label: string, step: number): MenuItemConstructorOptions {
+  return {
+    label,
+    accelerator: step === ZOOM_STEP ? 'CmdOrCtrl+=' : step === -ZOOM_STEP ? 'CmdOrCtrl+-' : 'CmdOrCtrl+0',
+    click: () => { applyZoom(activeWindow(), step) },
+  }
+}
+
+/**
+ * The application menu, modeled on the editor-standard File / Edit /
+ * Selection / View / Window / Help set. Sidebar commands drive the served
+ * UI's own controls, so their behavior always matches what the page shows.
+ */
 function installMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { role: 'fileMenu' },
-    { role: 'editMenu' },
-    { role: 'viewMenu' },
-    { role: 'windowMenu' },
+    {
+      label: '文件',
+      submenu: [
+        { label: '新建会话', accelerator: 'CmdOrCtrl+N', click: () => { clickInRenderer('[class*="newSession"]') } },
+        { type: 'separator' },
+        { label: '打开设置', accelerator: 'CmdOrCtrl+,', click: () => { clickInRenderer('[class*="settingsArea"] button') } },
+        {
+          label: '在浏览器中打开',
+          click: () => {
+            const url = activeWindow()?.webContents.getURL()
+            if (url !== undefined) void shell.openExternal(url)
+          },
+        },
+        { type: 'separator' },
+        { label: '退出', role: 'quit' },
+      ],
+    },
+    {
+      label: '编辑',
+      submenu: [
+        { label: '撤销', role: 'undo' },
+        { label: '重做', role: 'redo' },
+        { type: 'separator' },
+        { label: '剪切', role: 'cut' },
+        { label: '复制', role: 'copy' },
+        { label: '粘贴', role: 'paste' },
+      ],
+    },
+    {
+      label: '选择',
+      submenu: [
+        { label: '全选', role: 'selectAll' },
+      ],
+    },
+    {
+      label: '查看',
+      submenu: [
+        zoomMenuItem('放大', ZOOM_STEP),
+        zoomMenuItem('缩小', -ZOOM_STEP),
+        zoomMenuItem('重置缩放', 0),
+        { type: 'separator' },
+        { label: '切换侧栏', accelerator: 'CmdOrCtrl+B', click: () => { clickInRenderer('[class*="logoRow"] [class*="toggle"]') } },
+        { type: 'separator' },
+        { label: '重新加载', role: 'reload' },
+        { label: '强制重新加载', role: 'forceReload' },
+        { label: '开发者工具', role: 'toggleDevTools' },
+      ],
+    },
+    {
+      label: '窗口',
+      submenu: [
+        { label: '最小化', role: 'minimize' },
+        { label: '关闭窗口', role: 'close' },
+      ],
+    },
+    {
+      label: '帮助',
+      submenu: [
+        {
+          label: '关于 dsh',
+          click: () => {
+            void dialog.showMessageBox({
+              type: 'info',
+              title: '关于 dsh',
+              message: `dsh Desktop（Electron 外壳）\nElectron ${process.versions.electron}\nNode ${process.versions.node}`,
+            })
+          },
+        },
+        {
+          label: '上游仓库',
+          click: () => { void shell.openExternal('https://github.com/deepseek-ai/deepseek-harness') },
+        },
+      ],
+    },
   ]))
 }
 
@@ -201,6 +329,15 @@ async function boot(): Promise<void> {
     return
   }
   const window = createWindow()
+  // Ctrl/Cmd zoom is mapped from the physical key (see zoomStepForKey) so the
+  // plain Ctrl++ chord — Shift+= on most layouts — zooms like Ctrl+= does.
+  window.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+    const step = zoomStepForKey(input)
+    if (step === undefined) return
+    event.preventDefault()
+    applyZoom(window, step)
+  })
   started.on('exit', () => {
     if (shuttingDown) return
     dialog.showErrorBox('dsh exited', 'The dsh web process terminated unexpectedly; the shell closes with it.')

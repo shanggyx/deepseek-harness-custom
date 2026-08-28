@@ -31,13 +31,14 @@ dsh Desktop 是把 dsh 浏览器 UI 装进本地桌面窗口的 Electron 外壳�
 
 | 方面 | 约定 |
 |---|---|
-| 端口 | 子进程运行 `dsh web --port 0`；操作系统挑选空闲端口，外壳从就绪行读取。 |
+| 端口 | 子进程运行 `dsh web --port 0 --no-open`；操作系统挑选空闲端口，外壳从就绪行读取，页面只出现在桌面窗口（需要浏览器标签时用 文件 → 在浏览器中打开）。 |
+| 菜单栏 | 编辑器式 文件/编辑/选择/查看/窗口/帮助：新建会话 `Ctrl+N`、打开设置 `Ctrl+,`、缩放 `Ctrl+=` / `Ctrl+-` / `Ctrl+0`、切换侧栏 `Ctrl+B`、重新加载与开发者工具。 |
 | 单实例 | 再次启动（快捷方式或命令）只会聚焦已有窗口，不会拉起第二个 dsh 运行时。 |
 | 进程树 | 关闭窗口或退出应用会终结子进程的整棵进程树（Windows 上用 `taskkill /T /F`）。 |
 | 子进程退出 | dsh 进程自行退出时弹出错误对话框并随窗口关闭外壳。 |
 | 窗口几何 | 大小与位置持久化在 Electron userData 目录下的 `window-bounds.json`，加载时按当前显示器重新校验。 |
 | 缩放适应 | 三列 web 布局本身已随视口自适应；窗口只补充 `minWidth`/`minHeight`。 |
-| 缩放 | 标准 View 菜单 role 提供重置/放大/缩小与开发者工具。 |
+| 品牌名 | 侧栏名称与窗口标题来自 [`packages/client/locale/src/locales/`](../../packages/client/locale/src/locales/) 中的 `brand.localBuild` 文案。 |
 
 ## 环境变量覆盖
 
