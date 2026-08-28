@@ -22,6 +22,10 @@ dsh 的交互表面是浏览器 UI：`dsh web` 在 127.0.0.1 上服务 React 应
 
 窗口几何持久化在 Electron userData 目录下的 `window-bounds.json`，加载时按当前显示器重新校验：低于三列最小值的尺寸或落在所有显示器之外的位置回退到默认值。缩放适应本身不需要新代码——web 布局的 `ResizeObserver` 与列求解器已经在跟踪视口——所以外壳只补充 `minWidth`/`minHeight` 和标准缩放菜单 role。窗口在首帧前保持隐藏，配合页面 boot 主题脚本消除一切背景闪烁；外壳自己的 `backgroundColor` 只为首帧前的空档和缩放留白与亮色 base token 配对。
 
+### Windows 应用注册
+
+`scripts/install-app.ts` 让外壳像已安装的程序一样可达：它创建名为 `dsh` 的开始菜单与桌面快捷方式，二者都以检出里的 `electron.exe` 为目标、以应用目录为唯一参数，以随附的 `assets/dsh.ico`（品牌渐变底上的 favicon 鲸鱼）为图标，BrowserWindow 也使用同一图标。快捷方式落在用户自己的 Programs 与 Desktop 文件夹，因此 `Get-StartApps`、开始菜单搜索（Win+S）与桌面图标都能呈现该应用，无需安装器或管理员权限；`--remove` 删除它们。该注册指向检出目录，产物重建后由 `pnpm run desktop:install` 重新创建。
+
 ### 仓库集成
 
 该 app 与 `apps/cli` 一样是 release member（可发布 manifest、加入 workspace 约束门禁的 `files` 策略），以包内捆绑配置加入 host TypeScript face 与 root tsdown workspace，并且不携带 renderer preload：沙箱化的 preload 只支持 CJS，ESM 外壳的占位 preload 只会崩溃而不是占位。`electron` 仅是该 app 的 devDependency；其他 workspace 都不导入它，覆盖率门禁也保持只扫 packages。

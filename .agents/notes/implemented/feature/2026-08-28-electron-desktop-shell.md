@@ -22,6 +22,10 @@ The default launch runs the repository from source (`node --import tsx/esm apps/
 
 Window geometry persists to `window-bounds.json` under Electron's userData directory and is re-validated against the current display on load: a size below the three-column minimum or a position off every display falls back to defaults. Resize adaptation itself needs no new code — the web layout's `ResizeObserver` and column solver already track the viewport — so the shell adds only `minWidth`/`minHeight` and the stock zoom menu roles. The window stays hidden until first paint, which with the page's boot-theme script removes any background flash; the shell's own `backgroundColor` only pairs with the light base token for the pre-paint gap and resize gutters.
 
+### Windows app registration
+
+`scripts/install-app.ts` makes the shell reachable like an installed program: it creates a Start Menu and a desktop shortcut named `dsh`, each pointing at the checkout's `electron.exe` with the app directory as the single argument, the shipped `assets/dsh.ico` (the favicon whale on a brand-gradient tile) as the icon, and the same icon on the BrowserWindow. The shortcuts live in the user's own Programs and Desktop folders, so `Get-StartApps`, start-menu search (Win+S), and the desktop icon all surface the app without an installer or admin rights; `--remove` deletes them. The registration points into the checkout and is re-created by `pnpm run desktop:install` after the artifacts rebuild.
+
 ### Repository integration
 
 The app is a release member like `apps/cli` (publishable manifest, `files` policy added to the workspace-constraint gate), joins the host TypeScript face and the root tsdown workspace with a package-local bundle config, and ships no renderer preload: sandboxed preloads are CJS-only, so an ESM-shell stub preload would be a crash, not a placeholder. `electron` is a devDependency of this app alone; no other workspace imports it, and the coverage gate stays packages-scoped.

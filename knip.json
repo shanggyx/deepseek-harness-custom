@@ -7,6 +7,7 @@
     "bwrap",
     "icacls",
     "musl-gcc",
+    "powershell.exe",
     "python3",
     "sandbox-exec",
     "tar",
@@ -692,10 +693,12 @@
     "apps/desktop": {
       "entry": [
         "src/main.ts",
+        "scripts/*.ts",
         "tests/**/*.spec.ts"
       ],
       "project": [
         "src/**/*.ts",
+        "scripts/*.ts",
         "tests/**/*.ts"
       ]
     },

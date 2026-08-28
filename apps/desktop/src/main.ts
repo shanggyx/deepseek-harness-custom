@@ -13,7 +13,7 @@
 import { app, BrowserWindow, Menu, dialog, screen } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createInterface } from 'node:readline'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { DEFAULT_HEIGHT, DEFAULT_WIDTH, MIN_HEIGHT, MIN_WIDTH, sanitizeBounds, type WindowBounds } from './bounds.ts'
 import { parseReadyUrl } from './readiness.ts'
@@ -139,14 +139,25 @@ function saveBounds(bounds: WindowBounds): void {
   writeFileSync(path.join(dir, BOUNDS_FILE), JSON.stringify(bounds))
 }
 
+/**
+ * The window and taskbar icon, shipped beside the shell. Only Windows reads
+ * the .ico form; other platforms fall back to the runtime default.
+ */
+function windowIcon(): string | undefined {
+  const icon = path.join(app.getAppPath(), 'assets', 'dsh.ico')
+  return process.platform === 'win32' && existsSync(icon) ? icon : undefined
+}
+
 /** Create the window with its saved geometry and lifetime hooks. */
 function createWindow(): BrowserWindow {
   const saved = sanitizeBounds(loadBounds(), screen.getPrimaryDisplay().workArea)
+  const icon = windowIcon()
   const window = new BrowserWindow({
     width: saved?.width ?? DEFAULT_WIDTH,
     height: saved?.height ?? DEFAULT_HEIGHT,
     ...(saved?.x !== undefined && { x: saved.x }),
     ...(saved?.y !== undefined && { y: saved.y }),
+    ...(icon !== undefined && { icon }),
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
     backgroundColor: BACKGROUND,

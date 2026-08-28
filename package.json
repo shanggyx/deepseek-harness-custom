@@ -149,6 +149,8 @@
     "release:publish": "tsx scripts/release/publish.ts",
     "dsh": "node --import tsx/esm apps/cli/src/bin.ts",
     "desktop": "pnpm run build:web && pnpm --filter @deepseek-ai/dsh-desktop run build && pnpm --filter @deepseek-ai/dsh-desktop run start",
+    "desktop:install": "pnpm run build:web && pnpm --filter @deepseek-ai/dsh-desktop run build && pnpm --filter @deepseek-ai/dsh-desktop run install:app",
+    "desktop:uninstall": "pnpm --filter @deepseek-ai/dsh-desktop run install:app -- --remove",
     "demo:ptc": "node scripts/demo-ptc.mjs",
     "demo:inspector": "node --import tsx/esm apps/cli/src/bin.ts web --patch ./packages/experimental/inspector/cordis.source.patch.yml",
     "mock:llm": "node --import tsx packages/test-support/llm-mock-server/src/bin.ts",

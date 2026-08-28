@@ -18,7 +18,8 @@
   "license": "MIT",
   "scripts": {
     "build": "tsdown",
-    "start": "electron ."
+    "start": "electron .",
+    "install:app": "tsx scripts/install-app.ts"
   },
   "devDependencies": {
     "electron": "^44.0.0"
