@@ -21,6 +21,9 @@
     "start": "electron .",
     "install:app": "tsx scripts/install-app.ts"
   },
+  "dependencies": {
+    "@deepseek-ai/dsh-home-paths": "workspace:^"
+  },
   "devDependencies": {
     "electron": "^44.0.0"
   }

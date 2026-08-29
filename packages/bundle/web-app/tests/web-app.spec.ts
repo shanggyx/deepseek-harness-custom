@@ -68,19 +68,28 @@ function stageDist(): string {
   return index
 }
 
-/** A fake webServer capturing the fallback seat and index taps. */
-function fakeHttpServer(host: '127.0.0.1' | '0.0.0.0' = '127.0.0.1'): { server: WebServer; seat: () => unknown } {
+/** A fake webServer capturing named routes, the fallback seat, and index taps. */
+function fakeHttpServer(host: '127.0.0.1' | '0.0.0.0' = '127.0.0.1'): {
+  server: WebServer
+  seat: () => unknown
+  routes: Map<string, unknown>
+} {
   let fallback: unknown
+  const routes = new Map<string, unknown>()
   const server = {
     host,
     port: 4567,
+    register: (route: { path: string }) => {
+      routes.set(route.path, route)
+      return () => { routes.delete(route.path) }
+    },
     registerFallback: (handler: unknown) => {
       fallback = handler
       return () => { fallback = undefined }
     },
     renderIndex: (html: string) => html,
   } as unknown as WebServer
-  return { server, seat: () => fallback }
+  return { server, seat: () => fallback, routes }
 }
 
 /** Deterministic Host Connection face for URL publication and frontend injection. */
@@ -118,7 +127,7 @@ describe('web-app runtime glue', () => {
       { source: 'process', values: { VSCODE_IPC_HOOK_CLI: '/tmp/local-vscode-ipc' } },
       { source: 'project-env', path: '/work/.env', values: { SSH_CONNECTION: 'stale-project-value' } },
     ]))
-    const { server, seat } = fakeHttpServer('0.0.0.0')
+    const { server, seat, routes } = fakeHttpServer('0.0.0.0')
     ctx.provide('webServer', server)
     provideConnection(ctx)
     const contributions: BashContribution[] = []
@@ -134,6 +143,7 @@ describe('web-app runtime glue', () => {
     const openBrowser = vi.fn(async (url: string) => { lifecycle.push(`open:${url}`) })
     internals.openBrowser = openBrowser
     apply(ctx, new Config({ openBrowser: true, printUrl: true, surfaceContext: true, trustedHosts: ['lab.internal'] }))
+    expect(routes.has('/background-image')).toBe(true)
     await ctx.plugin(SystemPrompt, { persona: '' })
     // Settle the injected registrations.
     await new Promise(resolve => setTimeout(resolve, 0))

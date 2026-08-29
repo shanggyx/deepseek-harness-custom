@@ -38,7 +38,7 @@ dsh Desktop 是把 dsh 浏览器 UI 装进本地桌面窗口的 Electron 外壳�
 | 子进程退出 | dsh 进程自行退出时弹出错误对话框并随窗口关闭外壳。 |
 | 窗口几何 | 大小与位置持久化在 Electron userData 目录下的 `window-bounds.json`，加载时按当前显示器重新校验。 |
 | 缩放适应 | 三列 web 布局本身已随视口自适应；窗口只补充 `minWidth`/`minHeight`。 |
-| 背景 | 设置 → 通用设置 → 背景：默认 / 纯色 / 图片（https 链接，或经文件选择器导入的本地图片——外壳通过 `app://` 协议提供给页面），随主题持久化；顶部条自动跟随。 |
+| 背景 | 设置 → 通用设置 → 背景：默认 / 纯色 / 图片（https 链接，或经文件选择器导入的本地图片——存入 Harness 家目录、由 dsh web 服务器同源提供，桌面窗口与浏览器显示同一背景），随主题持久化；顶部条自动跟随。 |
 | 品牌名 | 侧栏名称与窗口标题来自 [`packages/client/locale/src/locales/`](../../packages/client/locale/src/locales/) 中的 `brand.localBuild` 文案。 |
 
 ## 环境变量覆盖

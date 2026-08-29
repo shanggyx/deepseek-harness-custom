@@ -12,11 +12,12 @@
 
 /* v8 ignore file -- the process-bound shell is exercised by launching the app. */
 
-import { app, BrowserWindow, dialog, ipcMain, protocol, screen, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen, shell } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { detectImageMime } from './image-mime.ts'
 import { DEFAULT_HEIGHT, DEFAULT_WIDTH, MIN_HEIGHT, MIN_WIDTH, sanitizeBounds, type WindowBounds } from './bounds.ts'
 import { parseReadyUrl } from './readiness.ts'
@@ -43,20 +44,11 @@ const PROFILE = 'web'
 /** One zoom step in webContents zoom-level units; 0 means "reset to 100%". */
 const ZOOM_STEP = 0.5
 
-/** The userData file holding the imported background image (raw bytes, no extension). */
-const BACKGROUND_IMAGE_FILE = 'background-image'
-
-/** The app-protocol URL prefix the page loads the imported image from; each import appends a cache-busting version. */
-const BACKGROUND_IMAGE_URL = 'app://background-image'
+/** The page-relative URL of the imported background image, served by the dsh web server. */
+const BACKGROUND_IMAGE_URL = '/background-image'
 
 /** Largest accepted imported background image. */
 const MAX_BACKGROUND_BYTES = 30 * 1024 * 1024
-
-// A custom scheme must be registered before app ready for the http-served
-// page to load `app://background-image` as a subresource.
-protocol.registerSchemesAsPrivileged([
-  { scheme: 'app', privileges: { secure: true, supportFetchAPI: true, stream: true } },
-])
 
 /**
  * The launcher invocation. The default runs the repository from source — the
@@ -363,19 +355,6 @@ function injectTopBar(window: BrowserWindow): void {
 
 /** Spawn dsh, wait for readiness, and load the served UI under the strip. */
 async function boot(): Promise<void> {
-  protocol.handle('app', (request) => {
-    const url = new URL(request.url)
-    if (url.host !== 'background-image') return new Response('not found', { status: 404 })
-    // ENOENT before any import: the page has no background configured anyway.
-    // no-store: a re-import changes the bytes under the same path, and the
-    // versioned import URL alone cannot reach already-open pages.
-    try {
-      const bytes = readFileSync(path.join(app.getPath('userData'), BACKGROUND_IMAGE_FILE))
-      return new Response(bytes, { headers: { 'content-type': detectImageMime(bytes), 'cache-control': 'no-store' } })
-    } catch {
-      return new Response('not found', { status: 404 })
-    }
-  })
   ipcMain.handle('shell:background-image', (_event, bytes: unknown) => {
     if (!(bytes instanceof ArrayBuffer) && !(ArrayBuffer.isView(bytes) && bytes.buffer instanceof ArrayBuffer)) {
       throw new Error('background image payload must be bytes')
@@ -384,11 +363,15 @@ async function boot(): Promise<void> {
     if (view.byteLength === 0 || view.byteLength > MAX_BACKGROUND_BYTES) {
       throw new Error(`background image must be 1 byte..${String(MAX_BACKGROUND_BYTES)} bytes`)
     }
-    const dir = app.getPath('userData')
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(path.join(dir, BACKGROUND_IMAGE_FILE), view)
-    // The versioned URL defeats the renderer's image cache, so a re-import
-    // replaces the visible background without a reload.
+    // The image lives in the Harness home and is served by the dsh web server
+    // itself at the page-relative URL, so the configured background works
+    // identically in this window and in any browser. The mime rides a sidecar
+    // (the bytes are stored extension-less); each import overwrites both. The
+    // version query is the re-fetch trigger: without a changed URL the page's
+    // inline style is byte-identical, no request fires, and the previous
+    // image stays painted.
+    writeFileSync(dshHomePath('background-image'), view)
+    writeFileSync(dshHomePath('background-image.type'), detectImageMime(view))
     return `${BACKGROUND_IMAGE_URL}?v=${String(Date.now())}`
   })
   const started = spawnDsh()

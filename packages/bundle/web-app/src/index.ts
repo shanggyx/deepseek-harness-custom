@@ -12,6 +12,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { networkInterfaces } from 'node:os'
@@ -22,6 +23,7 @@ import { addHarnessSourceSection } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import * as FrontendStatic from '@deepseek-ai/dsh-host-frontend-static'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
+import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type {} from '@deepseek-ai/dsh-host-webserver'
@@ -239,6 +241,32 @@ export function apply(ctx: Context, config: Config): void {
   const handoffBrowser = config.openBrowser && !launchedThroughSsh(ctx)
   // Release dependent rows only after bind-dependent trust has been sampled once.
   ctx.provide(WEB_RUNTIME_SERVICE, runtime)
+  // The user-imported background image (the desktop shell's import writes the
+  // bytes and their mime sidecar into the Harness home) served same-origin so
+  // the configured background works identically in the desktop window and in
+  // any browser. Deliberately unauthenticated: the payload is a wallpaper,
+  // and the server binds loopback unless the operator widened the fence.
+  ctx.webServer.register({
+    kind: 'exact',
+    path: '/background-image',
+    handler: (_req, res) => {
+      try {
+        const bytes = readFileSync(dshHomePath('background-image'))
+        let contentType = 'application/octet-stream'
+        try {
+          contentType = readFileSync(dshHomePath('background-image.type'), 'utf8').trim() || contentType
+        } catch {
+          // An absent sidecar falls back to the generic stream type.
+        }
+        res.writeHead(200, { 'content-type': contentType, 'cache-control': 'no-store' })
+        res.end(bytes)
+      } catch {
+        // ENOENT (no imported background yet) is the only expected failure.
+        res.writeHead(404, { 'content-type': 'text/plain' })
+        res.end('no imported background')
+      }
+    },
+  })
   ctx.plugin(FrontendStatic, { distIndex: internals.resolveDistIndex() })
   if (config.surfaceContext) {
     ctx.inject(['systemPrompt'], (promptCtx) => {
