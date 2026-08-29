@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/index.ts'
-import { StatusLine, cacheHitPercentValue, type StatusLineProps } from '../src/client/skeleton/StatusLine.tsx'
+import { StatusLine, cacheHitPercentValue, petFaceFor, type StatusLineProps } from '../src/client/skeleton/StatusLine.tsx'
 import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -34,6 +34,24 @@ describe('cacheHitPercentValue', () => {
   it('is null before anything was measured', () => {
     expect(cacheHitPercentValue(undefined)).toBeNull()
     expect(cacheHitPercentValue({ ...USAGE, uncachedInputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 })).toBeNull()
+  })
+})
+
+describe('petFaceFor', () => {
+  it('hatches fresh, stays content while cruising, and fusses under pressure', () => {
+    expect(petFaceFor(5)).toBe('🐣')
+    expect(petFaceFor(30)).toBe('😺')
+    expect(petFaceFor(70)).toBe('😣')
+    expect(petFaceFor(95)).toBe('🙀')
+  })
+
+  it('renders the companion beside the figures when occupancy is known', () => {
+    const view = line({ contextPressure: { projectedTokens: 64_000, contextWindow: 128_000 } })
+    expect(view.container.textContent).toContain('😺')
+  })
+
+  it('stays hidden while nothing is measurable', () => {
+    expect(line({}).container.textContent).not.toContain('😺')
   })
 })
 

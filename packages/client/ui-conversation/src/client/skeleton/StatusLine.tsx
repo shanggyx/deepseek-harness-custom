@@ -35,6 +35,21 @@ export function cacheHitPercentValue(usage: TokenUsageProjection | undefined): n
 }
 
 /**
+ * The pet face for one occupancy reading (the ccpet idea: the companion
+ * wears the context pressure so a glance beats reading numbers). Fresh
+ * sessions hatch, cruising stays content, the pressure bands fuss and
+ * panic — the panic band is the "clean up your context" hint.
+ * @param percent - occupancy percent (0..100).
+ * @returns the pet emoji.
+ */
+export function petFaceFor(percent: number): string {
+  if (percent < 10) return '🐣'
+  if (percent < 60) return '😺'
+  if (percent < 85) return '😣'
+  return '🙀'
+}
+
+/**
  * Render the composer status line.
  * @param props - the bar's projection hook and locale seat.
  * @returns the status line, or null while nothing is measurable.
@@ -43,8 +58,14 @@ export function StatusLine({ useProjection, t }: StatusLineProps) {
   const occupancy = contextOccupancy(useProjection('contextPressure'))
   const hit = cacheHitPercentValue(useProjection('tokenUsage'))
   if (occupancy === null && hit === null) return null
+  const petTitle = occupancy === null
+    ? undefined
+    : t('status.context', { percent: occupancy.percent })
   return (
     <div className={css.statusLine} data-dsh-status-line>
+      {occupancy !== null && (
+        <span className={css.pet} title={petTitle} aria-hidden="true">{petFaceFor(occupancy.percent)}</span>
+      )}
       {occupancy !== null && (
         <span className={css.item}>{t('status.context', { percent: occupancy.percent })}</span>
       )}

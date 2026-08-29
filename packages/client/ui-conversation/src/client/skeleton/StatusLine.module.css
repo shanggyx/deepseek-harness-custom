@@ -15,3 +15,16 @@
 .item {
   white-space: nowrap;
 }
+
+/* The companion wears the context pressure; the bob keeps it alive without
+   demanding attention. */
+.pet {
+  font-size: 14px;
+  line-height: 16px;
+  animation: dsh-pet-bob 2.4s ease-in-out infinite;
+}
+
+@keyframes dsh-pet-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
