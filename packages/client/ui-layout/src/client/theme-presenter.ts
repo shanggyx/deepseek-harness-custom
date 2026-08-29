@@ -16,6 +16,12 @@ export const DARK_ATTRIBUTE = 'data-ds-dark-theme'
 /** Body variable carrying the user's content font size in px. */
 export const CONTENT_FONT_SIZE_VARIABLE = '--dsh-content-font-size'
 
+/** Body inline styles this presenter writes for the custom background. */
+const BACKGROUND_PROPERTIES = [
+  '--dsw-alias-bg-base', 'background-color', 'background-image', 'background-size', 'background-position',
+  'background-attachment',
+] as const
+
 /** Applies theme snapshots to the document; one instance per plugin fiber. */
 export class ThemePresenter {
   /** Token names this presenter wrote in the last apply (its retraction set). */
@@ -51,17 +57,42 @@ export class ThemePresenter {
       body.style.setProperty(name, value)
       this.appliedTokens.push(name)
     }
+    this.applyBackground(body, snapshot)
     this.themeColorMeta.content = getComputedStyle(body).backgroundColor
     if (!this.themeColorMeta.isConnected) document.head.append(this.themeColorMeta)
   }
 
-  /** Retract root color-scheme, the palette attribute, token variables, the font-size axis, and the owned metadata node. */
+  /**
+   * Project the custom background: the runtime-precomputed bg-base override
+   * (user color, or the dimmed translucent wash an image shows through) plus
+   * the paint properties for image mode. `undefined` retracts everything this
+   * presenter wrote, restoring the base stylesheets' authority.
+   */
+  private applyBackground(body: HTMLElement, snapshot: ThemeSnapshot): void {
+    const { mode, color, url, baseOverride } = snapshot.background
+    for (const name of BACKGROUND_PROPERTIES) body.style.removeProperty(name)
+    if (baseOverride === undefined) return
+    body.style.setProperty('--dsw-alias-bg-base', baseOverride)
+    if (mode === 'color') {
+      body.style.backgroundColor = color
+      return
+    }
+    if (mode === 'image' && url !== '') {
+      body.style.backgroundImage = `url("${url.replace(/"/g, '%22')}")`
+      body.style.backgroundSize = 'cover'
+      body.style.backgroundPosition = 'center'
+      body.style.backgroundAttachment = 'fixed'
+    }
+  }
+
+  /** Retract root color-scheme, the palette attribute, token variables, the font-size axis, the background, and the owned metadata node. */
   dispose(): void {
     document.documentElement.style.removeProperty('color-scheme')
     const body = document.body
     body.removeAttribute(DARK_ATTRIBUTE)
     body.style.removeProperty(CONTENT_FONT_SIZE_VARIABLE)
     for (const name of this.appliedTokens) body.style.removeProperty(name)
+    for (const name of BACKGROUND_PROPERTIES) body.style.removeProperty(name)
     this.appliedTokens = []
     this.themeColorMeta.remove()
   }

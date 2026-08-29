@@ -9,6 +9,14 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-theme/client'
 import { ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
 
+/** One full theme section: the publish literals stay one-line by filling the background defaults here. */
+function fullSection(value: { preference: ThemeSettings['preference']; fontSize: number }): ThemeSettings {
+  return {
+    ...value,
+    backgroundMode: 'default', backgroundColor: '', backgroundUrl: '', backgroundDim: 60,
+  }
+}
+
 const make = (host = stubSettingsScope<ThemeSettings>()): {
   ctx: Context
   theme: ThemeRuntime
@@ -68,7 +76,14 @@ describe('ThemeRuntime', () => {
 
   it('adopts a published Host font size without writing it back', () => {
     const { theme, events, host } = make()
-    host.publish({ status: 'ready', value: { preference: 'system', fontSize: 12 }, revision: 1, writable: true })
+    host.publish({
+      status: 'ready',
+      value: {
+        preference: 'system', fontSize: 12,
+        backgroundMode: 'default', backgroundColor: '', backgroundUrl: '', backgroundDim: 60,
+      },
+      revision: 1, writable: true,
+    })
     expect(theme.getTheme().fontSize).toBe(12)
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
@@ -92,19 +107,64 @@ describe('ThemeRuntime', () => {
 
   it('adopts a published Host section without writing it back', () => {
     const { theme, events, host } = make()
-    host.publish({ status: 'ready', value: { preference: 'dark', fontSize: 14 }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: fullSection({ preference: 'dark', fontSize: 14 }), revision: 1, writable: true })
     expect(theme.getTheme().preference).toBe('dark')
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
-    host.publish({ value: { preference: 'dark', fontSize: 14 }, revision: 2 })
+    host.publish({ value: fullSection({ preference: 'dark', fontSize: 14 }), revision: 2 })
     expect(events).toHaveLength(1)
   })
 
   it('adopts a section already standing at construction', () => {
     const host = stubSettingsScope<ThemeSettings>()
-    host.publish({ status: 'ready', value: { preference: 'dark', fontSize: 14 }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: fullSection({ preference: 'dark', fontSize: 14 }), revision: 1, writable: true })
     const { theme } = make(host)
     expect(theme.getTheme().preference).toBe('dark')
+  })
+
+  it('setBackground writes through the scope, publishes the snapshot, and validates', () => {
+    const { theme, events, host } = make()
+    theme.setBackground({ mode: 'color', color: '#112233', url: '', dim: 60 })
+    expect(theme.getTheme().background).toEqual({
+      mode: 'color', color: '#112233', url: '', dim: 60, baseOverride: '#112233',
+    })
+    expect(host.set).toHaveBeenCalledWith('backgroundMode', 'color')
+    expect(host.set).toHaveBeenCalledWith('backgroundColor', '#112233')
+    expect(events.at(-1)?.background).toEqual({
+      mode: 'color', color: '#112233', url: '', dim: 60, baseOverride: '#112233',
+    })
+    theme.setBackground({ mode: 'default', color: '', url: '', dim: 60 })
+    expect(theme.getTheme().background.mode).toBe('default')
+    expect(() => theme.setBackground({ mode: 'sepia', color: '', url: '', dim: 60 } as never)).toThrow('background mode')
+    expect(() => theme.setBackground({ mode: 'color', color: '', url: '', dim: 60 })).toThrow('needs a color')
+    expect(() => theme.setBackground({ mode: 'image', color: '', url: 'https://x', dim: 91 })).toThrow('outside 0..90')
+  })
+
+  it('adopts a published background section without writing it back', () => {
+    const { theme, host } = make()
+    host.publish({
+      status: 'ready',
+      value: {
+        preference: 'dark', fontSize: 14,
+        backgroundMode: 'image', backgroundColor: '#4d6bfe',
+        backgroundUrl: 'https://example.com/wall.png', backgroundDim: 45,
+      },
+      revision: 1, writable: true,
+    })
+    expect(theme.getTheme().background).toEqual({
+      mode: 'image', color: '#4d6bfe', url: 'https://example.com/wall.png', dim: 45,
+      baseOverride: 'color-mix(in srgb, rgb(21, 21, 23) 45%, transparent)',
+    })
+  })
+
+  it('computes the scheme-aware bg-base override', async () => {
+    const { backgroundBaseOverride } = await import('../src/theme-settings.ts')
+    expect(backgroundBaseOverride({ mode: 'default', color: '', url: '', dim: 60 }, true)).toBeUndefined()
+    expect(backgroundBaseOverride({ mode: 'color', color: '#112233', url: '', dim: 60 }, false)).toBe('#112233')
+    expect(backgroundBaseOverride({ mode: 'image', color: '', url: 'https://x', dim: 60 }, true))
+      .toBe('color-mix(in srgb, rgb(21, 21, 23) 60%, transparent)')
+    expect(backgroundBaseOverride({ mode: 'image', color: '', url: 'https://x', dim: 45 }, false))
+      .toBe('color-mix(in srgb, rgb(255, 255, 255) 45%, transparent)')
   })
 
   it('throws on unknown setTheme ids, duplicate registration, and the system id', () => {

@@ -12,11 +12,12 @@
 
 /* v8 ignore file -- the process-bound shell is exercised by launching the app. */
 
-import { app, BrowserWindow, dialog, ipcMain, screen, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, protocol, screen, shell } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { detectImageMime } from './image-mime.ts'
 import { DEFAULT_HEIGHT, DEFAULT_WIDTH, MIN_HEIGHT, MIN_WIDTH, sanitizeBounds, type WindowBounds } from './bounds.ts'
 import { parseReadyUrl } from './readiness.ts'
 import { TOPBAR_SCRIPT } from './topbar.ts'
@@ -41,6 +42,21 @@ const PROFILE = 'web'
 
 /** One zoom step in webContents zoom-level units; 0 means "reset to 100%". */
 const ZOOM_STEP = 0.5
+
+/** The userData file holding the imported background image (raw bytes, no extension). */
+const BACKGROUND_IMAGE_FILE = 'background-image'
+
+/** The app-protocol URL the page loads the imported image from. */
+export const BACKGROUND_IMAGE_URL = 'app://background-image'
+
+/** Largest accepted imported background image. */
+const MAX_BACKGROUND_BYTES = 30 * 1024 * 1024
+
+// A custom scheme must be registered before app ready for the http-served
+// page to load `app://background-image` as a subresource.
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { secure: true, supportFetchAPI: true, stream: true } },
+])
 
 /**
  * The launcher invocation. The default runs the repository from source — the
@@ -347,6 +363,30 @@ function injectTopBar(window: BrowserWindow): void {
 
 /** Spawn dsh, wait for readiness, and load the served UI under the strip. */
 async function boot(): Promise<void> {
+  protocol.handle('app', (request) => {
+    const url = new URL(request.url)
+    if (url.host !== 'background-image') return new Response('not found', { status: 404 })
+    // ENOENT before any import: the page has no background configured anyway.
+    try {
+      const bytes = readFileSync(path.join(app.getPath('userData'), BACKGROUND_IMAGE_FILE))
+      return new Response(bytes, { headers: { 'content-type': detectImageMime(bytes) } })
+    } catch {
+      return new Response('not found', { status: 404 })
+    }
+  })
+  ipcMain.handle('shell:background-image', (_event, bytes: unknown) => {
+    if (!(bytes instanceof ArrayBuffer) && !(ArrayBuffer.isView(bytes) && bytes.buffer instanceof ArrayBuffer)) {
+      throw new Error('background image payload must be bytes')
+    }
+    const view = bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    if (view.byteLength === 0 || view.byteLength > MAX_BACKGROUND_BYTES) {
+      throw new Error(`background image must be 1 byte..${String(MAX_BACKGROUND_BYTES)} bytes`)
+    }
+    const dir = app.getPath('userData')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(path.join(dir, BACKGROUND_IMAGE_FILE), view)
+    return BACKGROUND_IMAGE_URL
+  })
   const started = spawnDsh()
   let url: URL
   try {

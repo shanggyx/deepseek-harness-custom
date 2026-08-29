@@ -38,6 +38,7 @@ It is a different launch path over the same UI. `npx @deepseek-ai/dsh web` runs 
 | Child exit | A dsh process that exits on its own shows an error dialog and closes the shell. |
 | Window geometry | Size and position persist to `window-bounds.json` under Electron's userData directory, re-validated against the current display on load. |
 | Resize | The three-column web layout already adapts to the viewport; the window adds only `minWidth`/`minHeight`. |
+| Background | 设置 → 通用设置 → 背景: 默认 / 纯色 / 图片 (an https URL or a local image imported through the file picker — served to the page over the shell's `app://` protocol), persisted with the theme; the title strip follows it. |
 | Brand | The sidebar name and window title come from the locale string `brand.localBuild` in [`packages/client/locale/src/locales/`](../../packages/client/locale/src/locales/). |
 
 ## Environment overrides

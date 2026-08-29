@@ -23,6 +23,54 @@ afterEach(() => {
   document.documentElement.style.removeProperty('color-scheme')
   document.body.removeAttribute(DARK_ATTRIBUTE)
   document.body.style.removeProperty('--dsh-content-font-size')
+  // The background paint rides the same shared jsdom body; clear it so a
+  // later default-mode case observes a clean start.
+  for (const property of [
+    '--dsw-alias-bg-base', 'background-color', 'background-image', 'background-size', 'background-position',
+    'background-attachment',
+  ]) document.body.style.removeProperty(property)
+  delete document.body.dataset.dshBackgroundMode
+  delete document.body.dataset.dshBackgroundColor
+  delete document.body.dataset.dshBackgroundUrl
+  delete document.body.dataset.dshBackgroundDim
+})
+
+describe('theme bootstrap background', () => {
+  function executeWithBackground(background: Parameters<typeof bootThemeInjection>[2], preference: ThemePreference = 'dark'): void {
+    const row = bootThemeInjection(preference, 14, background)
+    if (row.kind !== 'script') throw new Error('theme bootstrap row is not a script')
+    mockSystemDark(false)
+    runInNewContext(row.text, { document, matchMedia: globalThis.matchMedia })
+  }
+
+  it('paints the solid color and the bg-base override in color mode', () => {
+    executeWithBackground({ mode: 'color', color: '#112233', url: '', dim: 60 })
+    expect(document.body.style.backgroundColor).toBe('rgb(17, 34, 51)')
+    expect(document.body.style.getPropertyValue('--dsw-alias-bg-base')).toBe('#112233')
+    expect(document.body.dataset.dshBackgroundMode).toBe('color')
+  })
+
+  it('paints the image and the dimmed translucent base override in image mode', () => {
+    executeWithBackground({ mode: 'image', color: '', url: 'https://example.com/w.png', dim: 45 })
+    expect(document.body.style.backgroundImage).toBe('url("https://example.com/w.png")')
+    expect(document.body.style.backgroundSize).toBe('cover')
+    expect(document.body.style.backgroundAttachment).toBe('fixed')
+    expect(document.body.style.getPropertyValue('--dsw-alias-bg-base'))
+      .toBe('color-mix(in srgb, rgb(21, 21, 23) 45%, transparent)')
+  })
+
+  it('paints no background in the default mode and leaves the dataset for the runtime', () => {
+    executeWithBackground({ mode: 'default', color: '', url: '', dim: 60 })
+    expect(document.body.style.backgroundImage).toBe('')
+    expect(document.body.style.getPropertyValue('--dsw-alias-bg-base')).toBe('')
+    expect(document.body.dataset.dshBackgroundMode).toBe('default')
+  })
+
+  it('light palettes mix the light base for a system-resolved boot', () => {
+    executeWithBackground({ mode: 'image', color: '', url: 'https://example.com/w.png', dim: 45 }, 'system')
+    expect(document.body.style.getPropertyValue('--dsw-alias-bg-base'))
+      .toBe('color-mix(in srgb, rgb(255, 255, 255) 45%, transparent)')
+  })
 })
 
 describe('theme bootstrap row', () => {

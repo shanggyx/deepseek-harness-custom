@@ -25,4 +25,13 @@ contextBridge.exposeInMainWorld('dshShell', {
       callback(state)
     })
   },
+  /**
+   * Store an imported background image and resolve to the app-protocol URL
+   * the served page loads it from.
+   * @param bytes - the image bytes.
+   * @returns the image URL ('app://background-image').
+   */
+  async setBackgroundImage(bytes) {
+    return ipcRenderer.invoke('shell:background-image', bytes)
+  },
 })

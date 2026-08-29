@@ -4,7 +4,7 @@
  * row components read via props.useStore.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
-import { DEFAULT_FONT_SIZE, type ThemePreference } from '../theme-settings.ts'
+import { DEFAULT_BACKGROUND_DIM, DEFAULT_BACKGROUND_MODE, DEFAULT_FONT_SIZE, type BackgroundMode, type ThemePreference } from '../theme-settings.ts'
 
 /** Store state mirrored from the theme snapshot. */
 export interface AppearanceRowState {
@@ -60,6 +60,44 @@ export function createFontSizeRowStore(): EngineStoreHandle<FontSizeRowState, Fo
       sync: (d, fontSize: number, revision: number) => {
         if (revision <= d.revision) return
         d.fontSize = fontSize
+        d.revision = revision
+      },
+    },
+  })
+}
+
+/** Store state mirrored from the theme snapshot's background configuration. */
+export interface BackgroundRowState {
+  /** Persisted background mode. */
+  mode: BackgroundMode
+  /** Solid background color (color mode). */
+  color: string
+  /** Background image URL (image mode). */
+  url: string
+  /** Base-surface opacity over the background image, in percent. */
+  dim: number
+  /** Service revision; -1 until first sync so revision 0 lands as a change. */
+  revision: number
+}
+
+type BackgroundRowActions = {
+  sync: (draft: BackgroundRowState, background: Omit<BackgroundRowState, 'revision'>, revision: number) => void
+}
+
+/**
+ * Declares the Background row state and write surface.
+ * @returns the store handle.
+ */
+export function createBackgroundRowStore(): EngineStoreHandle<BackgroundRowState, BackgroundRowActions> {
+  return defineStore({
+    init: (): BackgroundRowState => ({ mode: DEFAULT_BACKGROUND_MODE, color: '', url: '', dim: DEFAULT_BACKGROUND_DIM, revision: -1 }),
+    actions: {
+      sync: (d, background, revision: number) => {
+        if (revision <= d.revision) return
+        d.mode = background.mode
+        d.color = background.color
+        d.url = background.url
+        d.dim = background.dim
         d.revision = revision
       },
     },

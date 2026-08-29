@@ -18,22 +18,27 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { AppearanceRowInjected } from './AppearanceRow.tsx'
 import { AppearanceRow } from './AppearanceRow.tsx'
+import type { BackgroundRowInjected } from './BackgroundRow.tsx'
+import { BackgroundRow } from './BackgroundRow.tsx'
 import type { FontSizeRowInjected } from './FontSizeRow.tsx'
 import { FontSizeRow } from './FontSizeRow.tsx'
-import { createAppearanceRowStore, createFontSizeRowStore } from './settings-store.ts'
+import { createAppearanceRowStore, createBackgroundRowStore, createFontSizeRowStore } from './settings-store.ts'
 import { installThemeStyles } from './styles.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import {
-  DEFAULT_FONT_SIZE, DEFAULT_PREFERENCE, FONT_SIZE_FIELD, FONT_SIZE_MAX, FONT_SIZE_MIN,
-  isThemePreference, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
-  type ThemePreference, type ThemeSettings,
+  BACKGROUND_DIM_FIELD, BACKGROUND_DIM_MAX, BACKGROUND_MODE_FIELD, BACKGROUND_MODES, BACKGROUND_COLOR_FIELD,
+  BACKGROUND_URL_FIELD, DEFAULT_BACKGROUND, DEFAULT_BACKGROUND_COLOR, DEFAULT_BACKGROUND_DIM, DEFAULT_BACKGROUND_MODE,
+  DEFAULT_BACKGROUND_URL, DEFAULT_FONT_SIZE, DEFAULT_PREFERENCE, FONT_SIZE_FIELD, FONT_SIZE_MAX, FONT_SIZE_MIN,
+  backgroundBaseOverride, isBackgroundMode, isThemePreference, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
+  type BackgroundProjection, type BackgroundSettings, type ThemePreference, type ThemeSettings,
 } from '../theme-settings.ts'
 
 export type { AppearanceRowComponentProps, AppearanceRowInjected } from './AppearanceRow.tsx'
+export type { BackgroundRowComponentProps, BackgroundRowInjected } from './BackgroundRow.tsx'
 export type { FontSizeRowComponentProps, FontSizeRowInjected } from './FontSizeRow.tsx'
-export type { AppearanceRowState, FontSizeRowState } from './settings-store.ts'
+export type { AppearanceRowState, BackgroundRowState, FontSizeRowState } from './settings-store.ts'
 export type { ThemeKey } from './locales.ts'
-export type { ThemePreference, ThemeSettings } from '../theme-settings.ts'
+export type { BackgroundMode, BackgroundProjection, BackgroundSettings, ThemePreference, ThemeSettings } from '../theme-settings.ts'
 
 /** Namespace owning this feature's settings-row copy. */
 export const SETTINGS_NS = 'settings.theme'
@@ -82,6 +87,8 @@ export interface ThemeSnapshot {
   preference: ThemePreference
   /** Conversation content font size in px (integer within FONT_SIZE_MIN..FONT_SIZE_MAX). */
   fontSize: number
+  /** The durable custom-background configuration with its palette-aware override. */
+  background: BackgroundProjection
   /**
    * The resolved active theme (`system` resolved via prefers-color-scheme)
    * with override layers folded into its tokens (seq order, later layers win
@@ -161,6 +168,7 @@ export class ThemeRuntime {
   private themes: ThemeDefinition[] = [...BUILTIN_THEMES]
   private preference: ThemePreference
   private fontSize: number = bootstrapFontSize()
+  private background: BackgroundSettings = bootstrapBackground()
   private revision = 0
   private snapshot: ThemeSnapshot
   private readonly media: MediaQueryList | undefined
@@ -254,13 +262,52 @@ export class ThemeRuntime {
     this.publish()
   }
 
+  /**
+   * Change the custom background configuration — the only background write
+   * entry. The mode must be a built-in mode with the payload its mode needs
+   * (a color for color mode, a URL for image mode); writes go through the
+   * settings scope and emit `theme/change`.
+   * @param background - the new configuration.
+   */
+  setBackground(background: BackgroundSettings): void {
+    if (!isBackgroundMode(background.mode)) {
+      throw new Error(`background mode ${JSON.stringify(background.mode)} is not one of ${BACKGROUND_MODES.join('/')}`)
+    }
+    if (background.mode === 'color' && background.color === '') {
+      throw new Error('color background mode needs a color')
+    }
+    if (!Number.isInteger(background.dim) || background.dim < 0 || background.dim > BACKGROUND_DIM_MAX) {
+      throw new Error(`background dim ${String(background.dim)} is outside 0..${String(BACKGROUND_DIM_MAX)}`)
+    }
+    this.background = {
+      mode: background.mode,
+      color: background.color,
+      url: background.url,
+      dim: background.dim,
+    }
+    void this.host.set(BACKGROUND_MODE_FIELD, this.background.mode)
+    void this.host.set(BACKGROUND_COLOR_FIELD, this.background.color)
+    void this.host.set(BACKGROUND_URL_FIELD, this.background.url)
+    void this.host.set(BACKGROUND_DIM_FIELD, this.background.dim)
+    this.publish()
+  }
+
   /** Adopt the scope's accepted durable preference without writing it back. */
   private adopt(): void {
     const section = this.host.getSnapshot().value
     if (section === undefined) return
-    if (this.preference === section.preference && this.fontSize === section.fontSize) return
+    const background: BackgroundSettings = {
+      mode: isBackgroundMode(section.backgroundMode) ? section.backgroundMode : DEFAULT_BACKGROUND_MODE,
+      color: section.backgroundColor ?? DEFAULT_BACKGROUND_COLOR,
+      url: section.backgroundUrl ?? DEFAULT_BACKGROUND_URL,
+      dim: section.backgroundDim ?? DEFAULT_BACKGROUND_DIM,
+    }
+    if (this.preference === section.preference && this.fontSize === section.fontSize
+      && this.background.mode === background.mode && this.background.color === background.color
+      && this.background.url === background.url && this.background.dim === background.dim) return
     this.preference = section.preference
     this.fontSize = section.fontSize
+    this.background = background
     this.publish()
   }
 
@@ -328,6 +375,12 @@ export class ThemeRuntime {
     return Object.freeze({
       preference: this.preference,
       fontSize: this.fontSize,
+      background: Object.freeze({
+        ...this.background,
+        // The palette-aware override is computed here so presenters stay pure
+        // projectors (client bundles forbid cross-plugin value imports).
+        baseOverride: backgroundBaseOverride(this.background, active.colorScheme === 'dark'),
+      }),
       active: this.composeActive(active),
       themes: Object.freeze([...this.themes]),
       revision: this.revision,
@@ -373,6 +426,24 @@ function bootstrapFontSize(): number {
   return Number.isInteger(parsed) && parsed >= FONT_SIZE_MIN && parsed <= FONT_SIZE_MAX
     ? parsed
     : DEFAULT_FONT_SIZE
+}
+
+/**
+ * Read the custom background the Host boot script wrote on `body` (same
+ * first-paint contract as {@link bootstrapFontSize}); per-field defaults
+ * cover non-browser runs and mounts without the boot script.
+ * @returns the bootstrapped background configuration.
+ */
+function bootstrapBackground(): BackgroundSettings {
+  if (typeof document === 'undefined') return { ...DEFAULT_BACKGROUND }
+  const mode = document.body.dataset.dshBackgroundMode
+  const dim = Number.parseInt(document.body.dataset.dshBackgroundDim ?? '', 10)
+  return {
+    mode: isBackgroundMode(mode) ? mode : DEFAULT_BACKGROUND_MODE,
+    color: document.body.dataset.dshBackgroundColor ?? DEFAULT_BACKGROUND_COLOR,
+    url: document.body.dataset.dshBackgroundUrl ?? DEFAULT_BACKGROUND_URL,
+    dim: Number.isInteger(dim) && dim >= 0 && dim <= BACKGROUND_DIM_MAX ? dim : DEFAULT_BACKGROUND_DIM,
+  }
 }
 
 /**
@@ -437,9 +508,12 @@ export function apply(ctx: ClientContext): void {
   let bound: BoundActions<typeof store> | undefined
   const fontSizeStore = createFontSizeRowStore()
   let fontSizeBound: BoundActions<typeof fontSizeStore> | undefined
+  const backgroundStore = createBackgroundRowStore()
+  let backgroundBound: BoundActions<typeof backgroundStore> | undefined
   const sync = (snapshot: ThemeSnapshot): void => {
     bound?.sync(snapshot.preference, snapshot.revision)
     fontSizeBound?.sync(snapshot.fontSize, snapshot.revision)
+    backgroundBound?.sync({ ...snapshot.background }, snapshot.revision)
   }
   ctx.on('theme/change', sync)
   const injected = (actions: BoundActions<typeof store>): AppearanceRowInjected => {
@@ -475,4 +549,20 @@ export function apply(ctx: ClientContext): void {
     locale: SETTINGS_NS,
     inject: fontSizeInjected,
   }, FontSizeRow))
+
+  const backgroundInjected = (actions: BoundActions<typeof backgroundStore>): BackgroundRowInjected => {
+    backgroundBound = actions
+    sync(theme.getTheme())
+    return {
+      setBackground: (background) => { theme.setBackground(background) },
+    }
+  }
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'background',
+    order: 12,
+    store: backgroundStore,
+    locale: SETTINGS_NS,
+    inject: backgroundInjected,
+  }, BackgroundRow))
 }

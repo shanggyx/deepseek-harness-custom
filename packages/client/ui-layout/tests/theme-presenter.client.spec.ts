@@ -7,10 +7,17 @@ import { DARK_ATTRIBUTE, ThemePresenter } from '@deepseek-ai/dsh-client-ui-layou
 const LIGHT_THEME_COLOR = 'rgb(255, 255, 255)'
 const DARK_THEME_COLOR = 'rgb(21, 21, 23)'
 
-function snapshot(colorScheme: 'light' | 'dark', tokens: Record<string, string> = {}, fontSize = 14): ThemeSnapshot {
+function snapshot(
+  colorScheme: 'light' | 'dark',
+  tokens: Record<string, string> = {},
+  fontSize = 14,
+  background: ThemeSnapshot['background'] = {
+    mode: 'default', color: '', url: '', dim: 60, baseOverride: undefined,
+  },
+): ThemeSnapshot {
   // The presenter must key off colorScheme, not the id — keep them distinct.
   const active = { id: `${colorScheme}-test`, colorScheme, tokens }
-  return { preference: colorScheme, fontSize, active, themes: [active], revision: 1 }
+  return { preference: colorScheme, fontSize, background, active, themes: [active], revision: 1 }
 }
 
 function clearThemePresentation(): void {
@@ -78,6 +85,35 @@ describe('ThemePresenter', () => {
     expect(document.body.style.getPropertyValue('--dsh-content-font-size')).toBe('14px')
     presenter.apply(snapshot('light', {}, 17))
     expect(document.body.style.getPropertyValue('--dsh-content-font-size')).toBe('17px')
+  })
+
+  it('applies a custom color background and retracts it on default', () => {
+    const presenter = new ThemePresenter()
+    presenter.apply(snapshot('light', {}, 14, {
+      mode: 'color', color: '#112233', url: '', dim: 60, baseOverride: '#112233',
+    }))
+    expect(document.body.style.getPropertyValue('--dsw-alias-bg-base')).toBe('#112233')
+    expect(document.body.style.backgroundColor).toBe('rgb(17, 34, 51)')
+    presenter.apply(snapshot('light'))
+    expect(document.body.style.getPropertyValue('--dsw-alias-bg-base')).toBe('')
+    expect(document.body.style.backgroundColor).toBe('')
+    presenter.dispose()
+  })
+
+  it('paints an image background with the dimmed base override and retracts it on default', () => {
+    const presenter = new ThemePresenter()
+    presenter.apply(snapshot('dark', {}, 14, {
+      mode: 'image', color: '', url: 'https://example.com/w.png', dim: 45,
+      baseOverride: 'color-mix(in srgb, rgb(21, 21, 23) 45%, transparent)',
+    }))
+    expect(document.body.style.backgroundImage).toBe('url("https://example.com/w.png")')
+    expect(document.body.style.backgroundAttachment).toBe('fixed')
+    expect(document.body.style.getPropertyValue('--dsw-alias-bg-base'))
+      .toBe('color-mix(in srgb, rgb(21, 21, 23) 45%, transparent)')
+    presenter.apply(snapshot('dark'))
+    expect(document.body.style.backgroundImage).toBe('')
+    expect(document.body.style.getPropertyValue('--dsw-alias-bg-base')).toBe('')
+    presenter.dispose()
   })
 
   it('dispose removes color-scheme, the attribute, the font-size axis, and every applied variable, sparing foreign inline styles', () => {
