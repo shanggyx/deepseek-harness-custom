@@ -24,6 +24,9 @@ import type {} from '@deepseek-ai/dsh-client-connection'
 import * as FrontendStatic from '@deepseek-ai/dsh-host-frontend-static'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
+import { credentialRef, type CredentialRef } from '@deepseek-ai/dsh-credentials'
+import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-credentials'
 import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type {} from '@deepseek-ai/dsh-host-webserver'
@@ -246,6 +249,66 @@ export function apply(ctx: Context, config: Config): void {
   // the configured background works identically in the desktop window and in
   // any browser. Deliberately unauthenticated: the payload is a wallpaper,
   // and the server binds loopback unless the operator widened the fence.
+  // Balance proxy for the desktop pet: the server owns the API key (its env
+  // carries the credential the llm-deepseek adapter resolves), so the pet
+  // polls this route instead of needing the key in its own environment.
+  ctx.webServer.register({
+    kind: 'exact',
+    path: '/deepseek-balance',
+    handler: async (_req, res) => {
+      const section = ctx.get('settings')?.get(settingsNamespace('llm-deepseek')) as
+        | { baseURL?: string; apiKeyEnv?: string }
+        | undefined
+      const configured = section?.baseURL ?? 'https://api.deepseek.com'
+      // The console host is not an API endpoint; balance lives on the API host.
+      const base = configured.replace(/\/+$/, '').replace('//platform.deepseek.com', '//api.deepseek.com')
+      // Same resolution chain the llm-deepseek adapter uses: the managed
+      // credential store first, the ambient launch environment second.
+      const ref: CredentialRef = credentialRef(section?.apiKeyEnv ?? 'DEEPSEEK_API_KEY')
+      const credentials = ctx.get('credentials')
+      let key: string | undefined
+      if (credentials !== undefined) {
+        const hit = await credentials.resolve(ref)
+        key = hit?.value
+      }
+      if (key === undefined || key === '') {
+        key = launchEnvironmentOf(ctx).get(ref)?.value
+      }
+      try {
+        if (key === undefined || key === '') {
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ kind: 'nokey', message: '未检测到 DEEPSEEK_API_KEY' }))
+          return
+        }
+        const response = await fetch(`${base}/user/balance`, { headers: { authorization: `Bearer ${key}` } })
+        if (!response.ok) {
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ kind: 'error', message: `HTTP ${String(response.status)}` }))
+          return
+        }
+        const data = await response.json() as {
+          is_available?: boolean
+          balance_infos?: Array<{ currency?: string; total_balance?: string }>
+        }
+        const info = data.balance_infos?.[0]
+        if (info?.total_balance === undefined) {
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ kind: 'error', message: '账户没有余额信息' }))
+          return
+        }
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({
+          kind: 'ok',
+          currency: info.currency ?? 'CNY',
+          total: Number(info.total_balance),
+          message: data.is_available === false ? '账户当前不可用' : undefined,
+        }))
+      } catch (error) {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ kind: 'error', message: error instanceof Error ? error.message : String(error) }))
+      }
+    },
+  })
   ctx.webServer.register({
     kind: 'exact',
     path: '/background-image',

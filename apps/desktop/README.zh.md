@@ -40,6 +40,7 @@ dsh Desktop 是把 dsh 浏览器 UI 装进本地桌面窗口的 Electron 外壳�
 | 缩放适应 | 三列 web 布局本身已随视口自适应；窗口只补充 `minWidth`/`minHeight`。 |
 | 背景 | 设置 → 通用设置 → 背景：默认 / 纯色 / 图片（https 链接，或经文件选择器导入的本地图片——存入 Harness 家目录、由 dsh web 服务器同源提供，桌面窗口与浏览器显示同一背景），随主题持久化；顶部条自动跟随。 |
 | 品牌名 | 侧栏名称与窗口标题来自 [`packages/client/locale/src/locales/`](../../packages/client/locale/src/locales/) 中的 `brand.localBuild` 文案。 |
+| 桌宠 | 一张透明置顶卡片停靠在屏幕右侧，显示 DeepSeek 账户剩余余额（每 3 分钟经 web 服务器的余额代理轮询——解析的是模型实际使用的那份凭据）。帮助 → 显示/隐藏 DeepSeek 桌宠 可开关。 |
 
 ## 环境变量覆盖
 

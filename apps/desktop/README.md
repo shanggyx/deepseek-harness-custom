@@ -40,6 +40,7 @@ It is a different launch path over the same UI. `npx @deepseek-ai/dsh web` runs 
 | Resize | The three-column web layout already adapts to the viewport; the window adds only `minWidth`/`minHeight`. |
 | Background | 设置 → 通用设置 → 背景: 默认 / 纯色 / 图片 (an https URL or a locally imported image — stored in the Harness home and served same-origin at `/background-image` by the dsh web server itself, so the desktop window and any browser show the same background), persisted with the theme; the title strip follows it. |
 | Brand | The sidebar name and window title come from the locale string `brand.localBuild` in [`packages/client/locale/src/locales/`](../../packages/client/locale/src/locales/). |
+| Desktop pet | A transparent always-on-top card docks to the screen's right edge wearing the DeepSeek account's remaining balance (polled every 3 minutes through the web server's balance proxy, which resolves the same credential the model runs on). 帮助 → 显示/隐藏 DeepSeek 桌宠 toggles it. |
 
 ## Environment overrides
 

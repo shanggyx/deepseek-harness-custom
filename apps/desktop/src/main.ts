@@ -19,6 +19,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { detectImageMime } from './image-mime.ts'
+import { PET_HEIGHT, PET_WIDTH, petStateScript, PET_HTML, type PetBalanceState } from './pet.ts'
 import { DEFAULT_HEIGHT, DEFAULT_WIDTH, MIN_HEIGHT, MIN_WIDTH, sanitizeBounds, type WindowBounds } from './bounds.ts'
 import { parseReadyUrl } from './readiness.ts'
 import { TOPBAR_SCRIPT } from './topbar.ts'
@@ -254,9 +255,76 @@ function broadcastShellState(window: BrowserWindow): void {
   window.webContents.send('shell:state', { maximized: window.isMaximized() })
 }
 
+/** Balance poll cadence for the desktop pet (the account total moves slowly). */
+const PET_POLL_MS = 3 * 60 * 1000
+
+/** The pet card window; created lazily, hidden — never destroyed — by its close button. */
+let petWindow: BrowserWindow | undefined
+let petVisible = true
+let lastPetState: PetBalanceState = { kind: 'nokey', message: '正在读取账户余额…' }
+
+async function pollPetBalance(): Promise<void> {
+  if (readyUrl === undefined) return
+  try {
+    // The dsh web server owns the API key (its env carries the credential the
+    // llm-deepseek adapter resolves) and proxies the balance with it — the pet
+    // asks the same account the harness runs on; the key never leaves it.
+    const response = await fetch(new URL('/deepseek-balance', readyUrl.origin))
+    lastPetState = await response.json() as PetBalanceState
+  } catch (error) {
+    lastPetState = { kind: 'error', message: error instanceof Error ? error.message : String(error) }
+  }
+  petWindow?.webContents.executeJavaScript(petStateScript(lastPetState), true).then(() => {}, () => {
+    // The pet page can be mid-navigation; the next poll repaints it.
+  })
+}
+
+/** Show the pet docked to the screen's right edge, creating it on first use. */
+function showPet(): void {
+  if (petWindow !== undefined && !petWindow.isDestroyed()) {
+    petWindow.show()
+    return
+  }
+  const { workArea } = screen.getPrimaryDisplay()
+  petWindow = new BrowserWindow({
+    width: PET_WIDTH,
+    height: PET_HEIGHT,
+    x: workArea.x + workArea.width - PET_WIDTH - 12,
+    y: workArea.y + Math.round(workArea.height / 2 - PET_HEIGHT / 2),
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+  })
+  petWindow.setAlwaysOnTop(true, 'screen-saver')
+  petWindow.on('closed', () => { petWindow = undefined })
+  void petWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(PET_HTML)}`)
+  void petWindow.webContents.executeJavaScript(petStateScript(lastPetState), true).then(() => {}, () => {})
+  void pollPetBalance()
+}
+
+function runPetAction(action: 'pet:toggle' | 'pet:hide' | 'pet:refresh'): void {
+  if (action === 'pet:hide') {
+    petWindow?.hide()
+    petVisible = false
+    return
+  }
+  if (action === 'pet:refresh') {
+    void pollPetBalance()
+    if (!petVisible) showPet()
+    return
+  }
+  petVisible = !petVisible
+  if (petVisible) showPet()
+  else petWindow?.hide()
+}
+
 /**
  * The main-side actions the in-page strip (and the keyboard map) invoke:
- * window controls, zoom, reloads, dialogs, and the external browser handoff.
+ * window controls, zoom, reloads, dialogs, the desktop pet, and the external
+ * browser handoff.
  */
 function runShellAction(action: string): void {
   const window = activeWindow()
@@ -289,6 +357,9 @@ function runShellAction(action: string): void {
       })
       break
     case 'upstream': void shell.openExternal('https://github.com/deepseek-ai/deepseek-harness'); break
+    case 'pet:toggle': runPetAction('pet:toggle'); break
+    case 'pet:hide': runPetAction('pet:hide'); break
+    case 'pet:refresh': runPetAction('pet:refresh'); break
     default: break
   }
 }
@@ -397,6 +468,10 @@ async function boot(): Promise<void> {
   await window.loadURL(url.href)
   injectTopBar(window)
   window.webContents.on('did-finish-load', () => { injectTopBar(window) })
+  if (petVisible) showPet()
+  void pollPetBalance()
+  const petPoll = setInterval(() => { void pollPetBalance() }, PET_POLL_MS)
+  window.on('closed', () => { clearInterval(petPoll) })
 }
 
 if (!app.requestSingleInstanceLock()) {
