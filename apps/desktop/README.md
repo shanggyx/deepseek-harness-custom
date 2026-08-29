@@ -32,7 +32,7 @@ It is a different launch path over the same UI. `npx @deepseek-ai/dsh web` runs 
 | Aspect | Contract |
 |---|---|
 | Port | The child runs `dsh web --port 0 --no-open`; the OS picks a free port, the shell reads it from the readiness line, and the page appears only in the desktop window (the 文件 menu has 在浏览器中打开 for a browser tab). |
-| Menu bar | Editor-style 文件/编辑/选择/查看/窗口/帮助: 新建会话 `Ctrl+N`, 打开设置 `Ctrl+,`, zoom `Ctrl+=` / `Ctrl+-` / `Ctrl+0`, 切换侧栏 `Ctrl+B`, reload and developer tools. |
+| Menu bar | The in-page title strip models the editor-standard 文件/编辑/选择/查看/窗口/帮助 set: 新建会话 `Ctrl+N`, 打开设置 `Ctrl+,`, zoom `Ctrl+=` / `Ctrl+-` / `Ctrl+0`, 切换侧栏 `Ctrl+B`, 选择菜单 `Ctrl+D` / `Ctrl+K`, 最小化 `Ctrl+M`, 关闭窗口 `Ctrl+W`, reload and developer tools. |
 | Single instance | A second launch (shortcut or command) focuses the first window instead of spawning a second dsh runtime. |
 | Process tree | Closing the window or quitting kills the child's whole process tree (`taskkill /T /F` on Windows). |
 | Child exit | A dsh process that exits on its own shows an error dialog and closes the shell. |

@@ -1,22 +1,25 @@
 /**
  * Electron main process for dsh Desktop. The shell owns no agent logic: it
  * spawns the same `dsh web` profile the browser workflow uses (`--port 0` so
- * the OS picks a free port), waits for the web runtime's documented readiness
- * URL line, and loads the served UI in a BrowserWindow. Closing the window
- * tears the child process tree down; a child that dies on its own surfaces an
- * error dialog and quits with the window.
+ * the OS picks a free port, `--no-open` so the page appears only here),
+ * waits for the web runtime's documented readiness URL line, and loads the
+ * served UI in a chrome-less BrowserWindow whose title bar is the injected
+ * in-page strip (see topbar.ts). Closing the window tears the child process
+ * tree down; a child that dies on its own surfaces an error dialog and quits
+ * with the window.
  * @module @deepseek-ai/dsh-desktop/main
  */
 
 /* v8 ignore file -- the process-bound shell is exercised by launching the app. */
 
-import { app, BrowserWindow, Menu, dialog, screen, shell, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen, shell } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { DEFAULT_HEIGHT, DEFAULT_WIDTH, MIN_HEIGHT, MIN_WIDTH, sanitizeBounds, type WindowBounds } from './bounds.ts'
 import { parseReadyUrl } from './readiness.ts'
+import { TOPBAR_SCRIPT } from './topbar.ts'
 
 /** Environment override naming the Node executable that launches dsh; a packaged shell points this at its bundled runtime. */
 const NODE_EXECUTABLE_ENV = 'DSH_DESKTOP_NODE'
@@ -35,6 +38,9 @@ const BACKGROUND = '#ffffff'
 
 /** The shell always runs the `web` profile: one fixed surface, no profile picker. */
 const PROFILE = 'web'
+
+/** One zoom step in webContents zoom-level units; 0 means "reset to 100%". */
+const ZOOM_STEP = 0.5
 
 /**
  * The launcher invocation. The default runs the repository from source — the
@@ -59,6 +65,12 @@ function repoRoot(): string {
 let child: ChildProcess | undefined
 /** Set once a shutdown is intentional, so the child's exit stops being an error to surface. */
 let shuttingDown = false
+/**
+ * The readiness URL exactly as printed: it carries the launch token that
+ * mints the auth cookie. The window's current URL loses the token after the
+ * page's token-for-cookie exchange, so 在浏览器中打开 must hand out this one.
+ */
+let readyUrl: URL | undefined
 
 /** Spawn the dsh web profile; its output stays on the terminal the shell started from. */
 function spawnDsh(): ChildProcess {
@@ -115,8 +127,8 @@ function awaitReadyUrl(started: ChildProcess): Promise<URL> {
       const url = parseReadyUrl(line)
       if (url !== undefined) finish(() => { resolve(url) })
     }
-    const onExit = (): void => { finish(() => { reject(new Error('dsh exited before printing its readiness URL')) }) }
-    const onError = (error: Error): void => { finish(() => { reject(new Error(`dsh could not be launched: ${error.message}`)) }) }
+    const onExit = (): void => finish(() => { reject(new Error('dsh exited before printing its readiness URL')) })
+    const onError = (error: Error): void => finish(() => { reject(new Error(`dsh could not be launched: ${error.message}`)) })
     lines.on('line', onLine)
     started.once('exit', onExit)
     started.once('error', onError)
@@ -150,7 +162,7 @@ function windowIcon(): string | undefined {
   return process.platform === 'win32' && existsSync(icon) ? icon : undefined
 }
 
-/** Create the window with its saved geometry and lifetime hooks. */
+/** Create the chrome-less window: the injected in-page strip is the title bar. */
 function createWindow(): BrowserWindow {
   const saved = sanitizeBounds(loadBounds(), screen.getPrimaryDisplay().workArea)
   const icon = windowIcon()
@@ -165,6 +177,10 @@ function createWindow(): BrowserWindow {
     backgroundColor: BACKGROUND,
     show: false,
     title: 'dsh',
+    titleBarStyle: 'hidden',
+    webPreferences: {
+      preload: path.join(app.getAppPath(), 'preload.cjs'),
+    },
   })
   // Hidden until first paint: no blank or unthemed frame ever shows.
   window.once('ready-to-show', () => { window.show() })
@@ -198,8 +214,10 @@ function clickInRenderer(selector: string): void {
   )
 }
 
-/** One zoom step in webContents zoom-level units; 0 means "reset to 100%". */
-const ZOOM_STEP = 0.5
+/** Forward one keyboard chord into the page, so a menu item rides the same path as the physical key. */
+function sendChord(key: string): void {
+  activeWindow()?.webContents.sendInputEvent({ type: 'keyDown', keyCode: key, modifiers: ['control'] })
+}
 
 /** Apply a zoom step (or a reset) to the window the menu or shortcut targets. */
 function applyZoom(window: BrowserWindow | undefined, step: number): void {
@@ -223,102 +241,112 @@ function zoomStepForKey(input: { control: boolean; meta: boolean; key: string; c
   return undefined
 }
 
-/** The zoom entry shared by the menu item and the physical-key mapping. */
-function zoomMenuItem(label: string, step: number): MenuItemConstructorOptions {
-  return {
-    label,
-    accelerator: step === ZOOM_STEP ? 'CmdOrCtrl+=' : step === -ZOOM_STEP ? 'CmdOrCtrl+-' : 'CmdOrCtrl+0',
-    click: () => { applyZoom(activeWindow(), step) },
+/** Push the window state (currently the maximized flag) to the in-page strip. */
+function broadcastShellState(window: BrowserWindow): void {
+  window.webContents.send('shell:state', { maximized: window.isMaximized() })
+}
+
+/**
+ * The main-side actions the in-page strip (and the keyboard map) invoke:
+ * window controls, zoom, reloads, dialogs, and the external browser handoff.
+ */
+function runShellAction(action: string): void {
+  const window = activeWindow()
+  switch (action) {
+    case 'openInBrowser': {
+      const url = readyUrl?.href ?? window?.webContents.getURL()
+      if (url !== undefined) void shell.openExternal(url)
+      break
+    }
+    case 'quit': app.quit(); break
+    case 'zoom:in': applyZoom(window, ZOOM_STEP); break
+    case 'zoom:out': applyZoom(window, -ZOOM_STEP); break
+    case 'zoom:reset': applyZoom(window, 0); break
+    case 'reload': window?.webContents.reload(); break
+    case 'forceReload': window?.webContents.reloadIgnoringCache(); break
+    case 'devtools': window?.webContents.toggleDevTools(); break
+    case 'win:minimize': window?.minimize(); break
+    case 'win:toggleMaximize':
+      if (window === undefined) break
+      if (window.isMaximized()) window.unmaximize()
+      else window.maximize()
+      broadcastShellState(window)
+      break
+    case 'win:close': window?.close(); break
+    case 'about':
+      void dialog.showMessageBox({
+        type: 'info',
+        title: '关于 dsh',
+        message: `上官云霄的 DSH（dsh Desktop）\nElectron ${process.versions.electron}\nNode ${process.versions.node}`,
+      })
+      break
+    case 'upstream': void shell.openExternal('https://github.com/deepseek-ai/deepseek-harness'); break
+    default: break
   }
 }
 
 /**
- * The application menu, modeled on the editor-standard File / Edit /
- * Selection / View / Window / Help set. Sidebar commands drive the served
- * UI's own controls, so their behavior always matches what the page shows.
+ * The full Ctrl/ Cmd keyboard map, resolved from physical keys: the zoom
+ * family (see zoomStepForKey), the sidebar commands, the composer chords,
+ * and the reload family. With the native menu bar gone, this is the one
+ * accelerator path — the strip's shortcut texts are pure display.
  */
-function installMenu(): void {
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    {
-      label: '文件',
-      submenu: [
-        { label: '新建会话', accelerator: 'CmdOrCtrl+N', click: () => { clickInRenderer('[class*="newSession"]') } },
-        { type: 'separator' },
-        { label: '打开设置', accelerator: 'CmdOrCtrl+,', click: () => { clickInRenderer('[class*="settingsArea"] button') } },
-        {
-          label: '在浏览器中打开',
-          click: () => {
-            const url = activeWindow()?.webContents.getURL()
-            if (url !== undefined) void shell.openExternal(url)
-          },
-        },
-        { type: 'separator' },
-        { label: '退出', role: 'quit' },
-      ],
-    },
-    {
-      label: '编辑',
-      submenu: [
-        { label: '撤销', role: 'undo' },
-        { label: '重做', role: 'redo' },
-        { type: 'separator' },
-        { label: '剪切', role: 'cut' },
-        { label: '复制', role: 'copy' },
-        { label: '粘贴', role: 'paste' },
-      ],
-    },
-    {
-      label: '选择',
-      submenu: [
-        { label: '全选', role: 'selectAll' },
-      ],
-    },
-    {
-      label: '查看',
-      submenu: [
-        zoomMenuItem('放大', ZOOM_STEP),
-        zoomMenuItem('缩小', -ZOOM_STEP),
-        zoomMenuItem('重置缩放', 0),
-        { type: 'separator' },
-        { label: '切换侧栏', accelerator: 'CmdOrCtrl+B', click: () => { clickInRenderer('[class*="logoRow"] [class*="toggle"]') } },
-        { type: 'separator' },
-        { label: '重新加载', role: 'reload' },
-        { label: '强制重新加载', role: 'forceReload' },
-        { label: '开发者工具', role: 'toggleDevTools' },
-      ],
-    },
-    {
-      label: '窗口',
-      submenu: [
-        { label: '最小化', role: 'minimize' },
-        { label: '关闭窗口', role: 'close' },
-      ],
-    },
-    {
-      label: '帮助',
-      submenu: [
-        {
-          label: '关于 dsh',
-          click: () => {
-            void dialog.showMessageBox({
-              type: 'info',
-              title: '关于 dsh',
-              message: `dsh Desktop（Electron 外壳）\nElectron ${process.versions.electron}\nNode ${process.versions.node}`,
-            })
-          },
-        },
-        {
-          label: '上游仓库',
-          click: () => { void shell.openExternal('https://github.com/deepseek-ai/deepseek-harness') },
-        },
-      ],
-    },
-  ]))
+function installKeyboardMap(window: BrowserWindow): void {
+  window.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !(input.control || input.meta)) return
+    const zoom = zoomStepForKey(input)
+    if (zoom !== undefined) {
+      event.preventDefault()
+      applyZoom(window, zoom)
+      return
+    }
+    const key = input.key.toLowerCase()
+    const plain = input.shift === false
+    switch (key) {
+      case 'n':
+        if (plain) { event.preventDefault(); clickInRenderer('[class*="newSession"]') }
+        break
+      case ',':
+        if (plain) { event.preventDefault(); clickInRenderer('[class*="settingsArea"] button') }
+        break
+      case 'b':
+        if (plain) { event.preventDefault(); clickInRenderer('[class*="logoRow"] [class*="toggle"]') }
+        break
+      case 'd':
+        if (plain) { event.preventDefault(); sendChord('d') }
+        break
+      case 'k':
+        if (plain) { event.preventDefault(); sendChord('k') }
+        break
+      case 'm':
+        if (plain) { event.preventDefault(); runShellAction('win:minimize') }
+        break
+      case 'w':
+        if (plain) { event.preventDefault(); runShellAction('win:close') }
+        break
+      case 'r':
+        event.preventDefault()
+        if (input.shift) window.webContents.reloadIgnoringCache()
+        else window.webContents.reload()
+        break
+      case 'i':
+        if (input.shift) { event.preventDefault(); window.webContents.toggleDevTools() }
+        break
+      default: break
+    }
+  })
 }
 
-/** Spawn dsh, wait for readiness, and load the served UI. */
+/** Inject the in-page title bar; idempotent, re-run after every page load. */
+function injectTopBar(window: BrowserWindow): void {
+  void window.webContents.executeJavaScript(TOPBAR_SCRIPT, true).then(() => {}, () => {
+    // A navigation can outpace the injection; the next did-finish-load
+    // re-runs it, so nothing else can reach this failure.
+  })
+}
+
+/** Spawn dsh, wait for readiness, and load the served UI under the strip. */
 async function boot(): Promise<void> {
-  installMenu()
   const started = spawnDsh()
   let url: URL
   try {
@@ -328,16 +356,11 @@ async function boot(): Promise<void> {
     app.exit(1)
     return
   }
+  readyUrl = url
   const window = createWindow()
-  // Ctrl/Cmd zoom is mapped from the physical key (see zoomStepForKey) so the
-  // plain Ctrl++ chord — Shift+= on most layouts — zooms like Ctrl+= does.
-  window.webContents.on('before-input-event', (event, input) => {
-    if (input.type !== 'keyDown') return
-    const step = zoomStepForKey(input)
-    if (step === undefined) return
-    event.preventDefault()
-    applyZoom(window, step)
-  })
+  installKeyboardMap(window)
+  window.on('maximize', () => { broadcastShellState(window) })
+  window.on('unmaximize', () => { broadcastShellState(window) })
   started.on('exit', () => {
     if (shuttingDown) return
     dialog.showErrorBox('dsh exited', 'The dsh web process terminated unexpectedly; the shell closes with it.')
@@ -345,6 +368,8 @@ async function boot(): Promise<void> {
     app.exit(1)
   })
   await window.loadURL(url.href)
+  injectTopBar(window)
+  window.webContents.on('did-finish-load', () => { injectTopBar(window) })
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -355,5 +380,8 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', focusWindow)
   app.on('window-all-closed', () => { app.quit() })
   app.on('before-quit', stopChild)
+  ipcMain.on('shell:action', (_event, action: unknown) => {
+    if (typeof action === 'string') runShellAction(action)
+  })
   void app.whenReady().then(boot)
 }

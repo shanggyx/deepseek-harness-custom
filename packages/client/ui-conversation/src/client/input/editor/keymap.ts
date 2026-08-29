@@ -14,10 +14,11 @@
  */
 import type { LexicalEditor } from 'lexical'
 import {
-  COMMAND_PRIORITY_CRITICAL, KEY_ARROW_DOWN_COMMAND, KEY_ARROW_UP_COMMAND, KEY_ENTER_COMMAND,
-  KEY_ESCAPE_COMMAND, KEY_SPACE_COMMAND, KEY_TAB_COMMAND, PASTE_COMMAND,
+  $createRangeSelection, $getRoot, $getSelection, $isRangeSelection, $setSelection, TextNode,
+  COMMAND_PRIORITY_CRITICAL, KEY_ARROW_DOWN_COMMAND, KEY_ARROW_UP_COMMAND, KEY_DOWN_COMMAND,
+  KEY_ENTER_COMMAND, KEY_ESCAPE_COMMAND, KEY_SPACE_COMMAND, KEY_TAB_COMMAND, PASTE_COMMAND,
 } from 'lexical'
-import { mergeRegister } from '@lexical/utils'
+import { $dfs, mergeRegister } from '@lexical/utils'
 import type { ArbitrateKey, ArbitrateOutcome } from '../../contract/input.ts'
 
 /** The bar-supplied behavior behind each intercepted gesture. */
@@ -43,6 +44,85 @@ function isComposingEvent(event: KeyboardEvent, recentlyComposing: () => boolean
   // keyCode 229 is the legacy IME-composition signal engines emit without isComposing.
   // oxlint-disable-next-line typescript/no-deprecated
   return event.isComposing || event.keyCode === 229 || recentlyComposing()
+}
+
+/** One text node's [start, end) span inside the root's flat text. */
+interface TextSpan {
+  node: TextNode
+  start: number
+  end: number
+}
+
+/** The flat text of the composer with per-node spans (paragraph breaks count as two characters, matching `getTextContent`). */
+function flatText(): { spans: TextSpan[]; haystack: string } {
+  const spans: TextSpan[] = []
+  let cursor = 0
+  let haystack = ''
+  $getRoot().getChildren().forEach((paragraph, index) => {
+    if (index > 0) {
+      haystack += '\n\n'
+      cursor += 2
+    }
+    for (const { node } of $dfs(paragraph)) {
+      if (!(node instanceof TextNode)) continue
+      const length = node.getTextContentSize()
+      spans.push({ node, start: cursor, end: cursor + length })
+      haystack += node.getTextContent()
+      cursor += length
+    }
+  })
+  return { spans, haystack }
+}
+
+/** The absolute offset of one selection point, or undefined when it is not on plain text. */
+function absoluteOffset(spans: readonly TextSpan[], point: { key: string; offset: number }): number | undefined {
+  const span = spans.find(candidate => candidate.node.getKey() === point.key)
+  return span === undefined ? undefined : span.start + point.offset
+}
+
+/**
+ * Select the next occurrence of the current selection (wrapping once), or —
+ * on a collapsed caret — the word under it. Match search is flat over the
+ * whole composer; a match that would cross a node boundary (chip, line
+ * break) is skipped rather than partially selected.
+ * @param editor - the shell-owned editor.
+ * @returns true when a selection was (re)applied.
+ */
+export function selectComposerNextOccurrence(editor: LexicalEditor): boolean {
+  let applied = false
+  editor.update(() => {
+    const selection = $getSelection()
+    if (!$isRangeSelection(selection)) return
+    const { spans, haystack } = flatText()
+    const anchor = absoluteOffset(spans, selection.anchor)
+    const focus = absoluteOffset(spans, selection.focus)
+    if (anchor === undefined || focus === undefined) return
+    let needle = selection.getTextContent()
+    let searchFrom: number
+    if (needle === '') {
+      // Collapsed caret: take the word (letter/digit/CJK run) around it.
+      const word = [...haystack.matchAll(/[\w\u4e00-\u9fff]+/g)].find(match => match.index !== undefined
+        && match.index <= anchor && anchor <= match.index + match[0].length)
+      if (word === undefined || word.index === undefined || word[0] === '') return
+      needle = word[0]
+      searchFrom = word.index + word[0].length
+    } else {
+      searchFrom = Math.max(anchor, focus)
+    }
+    let matchStart = haystack.indexOf(needle, searchFrom)
+    if (matchStart === -1) matchStart = haystack.indexOf(needle)
+    if (matchStart === -1) return
+    // A wrapped hit landing inside the current selection is the same match.
+    if (matchStart >= Math.min(anchor, focus) && matchStart + needle.length <= Math.max(anchor, focus)) return
+    const span = spans.find(candidate => candidate.start <= matchStart && matchStart + needle.length <= candidate.end)
+    if (span === undefined) return
+    const next = $createRangeSelection()
+    next.anchor.set(span.node.getKey(), matchStart - span.start, 'text')
+    next.focus.set(span.node.getKey(), matchStart - span.start + needle.length, 'text')
+    $setSelection(next)
+    applied = true
+  })
+  return applied
 }
 
 /**
@@ -84,6 +164,17 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
     }),
     editor.registerCommand(KEY_ARROW_UP_COMMAND, arrow('up'), COMMAND_PRIORITY_CRITICAL),
     editor.registerCommand(KEY_ARROW_DOWN_COMMAND, arrow('down'), COMMAND_PRIORITY_CRITICAL),
+    // Ctrl/Cmd+D and Ctrl/Cmd+K walk the next occurrence of the selection
+    // (D picks the word under a collapsed caret first). The desktop shell's
+    // 选择 menu forwards the same chords, so menu and keyboard share one path.
+    editor.registerCommand(KEY_DOWN_COMMAND, (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return false
+      const key = event.key.toLowerCase()
+      if (key !== 'd' && key !== 'k') return false
+      if (isComposingEvent(event, recentlyComposing)) return false
+      event.preventDefault()
+      return selectComposerNextOccurrence(editor)
+    }, COMMAND_PRIORITY_CRITICAL),
     // Tab drills into a drillable highlighted row; otherwise it passes so the
     // browser keeps its native focus traversal.
     editor.registerCommand(KEY_TAB_COMMAND, arrow('tab'), COMMAND_PRIORITY_CRITICAL),
