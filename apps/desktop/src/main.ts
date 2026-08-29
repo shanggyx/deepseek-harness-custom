@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { detectImageMime } from './image-mime.ts'
-import { PET_HEIGHT, PET_WIDTH, petStateScript, PET_HTML, type PetBalanceState } from './pet.ts'
+import { PET_HEIGHT, PET_WIDTH, petStateScript, type PetBalanceState } from './pet.ts'
 import { DEFAULT_HEIGHT, DEFAULT_WIDTH, MIN_HEIGHT, MIN_WIDTH, sanitizeBounds, type WindowBounds } from './bounds.ts'
 import { parseReadyUrl } from './readiness.ts'
 import { TOPBAR_SCRIPT } from './topbar.ts'
@@ -300,7 +300,7 @@ function showPet(): void {
   })
   petWindow.setAlwaysOnTop(true, 'screen-saver')
   petWindow.on('closed', () => { petWindow = undefined })
-  void petWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(PET_HTML)}`)
+  void petWindow.loadFile(path.join(app.getAppPath(), 'pet.html'))
   void petWindow.webContents.executeJavaScript(petStateScript(lastPetState), true).then(() => {}, () => {})
   void pollPetBalance()
 }

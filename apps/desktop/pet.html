@@ -1,0 +1,54 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  .stage { position: relative; width: 200px; height: 430px;
+    -webkit-app-region: drag; user-select: none; }
+  .bubble { position: absolute; top: 4px; left: 8px; right: 8px; z-index: 2;
+    background: rgba(24, 26, 32, 0.92); color: #e8eaf0; border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14); padding: 7px 10px;
+    text-align: center; font: 12px/17px 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    opacity: 0; transform: translateY(6px); transition: opacity 0.22s, transform 0.22s;
+    pointer-events: none; }
+  .bubble .b-amount { font-size: 15px; font-weight: 600;
+    font-variant-numeric: tabular-nums; }
+  .bubble .b-sub { font-size: 10px; opacity: 0.6; }
+  .stage:hover .bubble { opacity: 1; transform: translateY(0); }
+  .girlwrap { position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex; justify-content: center; }
+  .girl { width: 192px; animation: pet-bob 3.4s ease-in-out infinite;
+    transform-origin: 50% 100%; }
+  .stage:hover .girl { animation: pet-hop 0.7s ease-in-out infinite; }
+  @keyframes pet-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  @keyframes pet-hop {
+    0%, 100% { transform: translateY(0) scale(1, 1); }
+    30% { transform: translateY(-10px) scale(0.98, 1.04); }
+    60% { transform: translateY(0) scale(1.03, 0.96); }
+  }
+</style></head><body><div class="stage" id="stage">
+  <div class="bubble">
+    <div class="b-amount" id="b-amount">—</div>
+    <div class="b-sub" id="b-sub">DeepSeek 剩余用量</div>
+  </div>
+  <div class="girlwrap"><img class="girl" src="assets/pet.png" alt=""></div>
+</div><script>
+  window.__updatePet = function (state) {
+    var amount = document.getElementById('b-amount')
+    var sub = document.getElementById('b-sub')
+    if (state.kind === 'ok') {
+      var symbol = state.currency === 'CNY' ? '¥ ' : state.currency === 'USD' ? '$ ' : ''
+      var low = state.total !== undefined && state.total < 20
+      amount.textContent = symbol + (state.total !== undefined ? state.total.toFixed(2) : '—')
+      sub.textContent = low ? '余额偏低，记得充值' : '账户可用'
+    } else if (state.kind === 'nokey') {
+      amount.textContent = '—'
+      sub.textContent = state.message ?? '未检测到 API KEY'
+    } else {
+      amount.textContent = '—'
+      sub.textContent = state.message ?? '余额查询失败'
+    }
+  }
+</script></body></html>
