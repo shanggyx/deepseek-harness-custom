@@ -34,6 +34,7 @@ import { DecoratorPortals } from '../input/editor/DecoratorPortals.tsx'
 import { registerComposerKeymap } from '../input/editor/keymap.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { ContextMeter } from './ContextMeter.tsx'
+import { StatusLine } from './StatusLine.tsx'
 import { PermissionSelect } from './PermissionSelect.tsx'
 import css from './InputBar.module.css'
 
@@ -494,6 +495,7 @@ export function InputBar({
                 )}
               </button>
             </Tooltip>
+            <StatusLine useProjection={useProjection} t={t} />
           </div>
         </div>
       </div>

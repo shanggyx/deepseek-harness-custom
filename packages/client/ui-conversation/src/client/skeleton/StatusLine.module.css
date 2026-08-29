@@ -1,0 +1,17 @@
+/* Composer status line: one slim tertiary row under the control row, inside
+ * the composer's own padding rhythm. */
+
+.statusLine {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px 8px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.item {
+  white-space: nowrap;
+}
