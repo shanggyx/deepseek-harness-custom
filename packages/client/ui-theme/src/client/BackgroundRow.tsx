@@ -53,16 +53,18 @@ const CUBES: readonly { id: BackgroundMode; labelKey: ThemeKey }[] = [
 export function BackgroundRow({ t, setBackground, useStore }: BackgroundRowComponentProps) {
   const { mode, color, url, dim } = useStore(s => s)
   const [urlDraft, setUrlDraft] = useState(url)
+  const [dimDraft, setDimDraft] = useState(dim)
   const [importing, setImporting] = useState(false)
   const fileInput = useRef<HTMLInputElement | null>(null)
   useEffect(() => { setUrlDraft(url) }, [url])
+  useEffect(() => { setDimDraft(dim) }, [dim])
 
   const setMode = (next: BackgroundMode): void => {
     setBackground({
       mode: next,
       color: color === '' ? DEFAULT_BACKGROUND_COLOR : color,
       url: urlDraft,
-      dim,
+      dim: dimDraft,
     })
   }
   const commitUrl = (): void => {
@@ -71,7 +73,7 @@ export function BackgroundRow({ t, setBackground, useStore }: BackgroundRowCompo
       setUrlDraft(url)
       return
     }
-    setBackground({ mode: 'image', color, url: urlDraft, dim })
+    setBackground({ mode: 'image', color, url: urlDraft, dim: dimDraft })
   }
   const importLocal = async (file: File): Promise<void> => {
     setImporting(true)
@@ -80,10 +82,17 @@ export function BackgroundRow({ t, setBackground, useStore }: BackgroundRowCompo
       if (bridge === undefined) return
       const importedUrl = await bridge.setBackgroundImage(await file.arrayBuffer())
       setUrlDraft(importedUrl)
-      setBackground({ mode: 'image', color, url: importedUrl, dim })
+      setBackground({ mode: 'image', color, url: importedUrl, dim: dimDraft })
     } finally {
       setImporting(false)
     }
+  }
+  // The slider drags a local draft and commits once on release: every tick
+  // write would flood the settings scope, whose async adoptions then bounce
+  // the thumb back to stale values mid-drag.
+  const commitDim = (): void => {
+    if (urlDraft === '' || dimDraft === dim) return
+    setBackground({ mode: 'image', color, url: urlDraft, dim: dimDraft })
   }
 
   return (
@@ -157,16 +166,14 @@ export function BackgroundRow({ t, setBackground, useStore }: BackgroundRowCompo
                 min={0}
                 max={BACKGROUND_DIM_MAX}
                 step={5}
-                value={dim}
+                value={dimDraft}
                 disabled={urlDraft === ''}
                 aria-label={t('background.dim')}
-                onChange={(event) => {
-                  const nextDim = Number.parseInt(event.target.value, 10)
-                  if (urlDraft === '') return
-                  setBackground({ mode: 'image', color, url: urlDraft, dim: nextDim })
-                }}
+                onChange={(event) => { setDimDraft(Number.parseInt(event.target.value, 10)) }}
+                onPointerUp={commitDim}
+                onKeyUp={commitDim}
               />
-              <span className={css.dimValue}>{dim}%</span>
+              <span className={css.dimValue}>{dimDraft}%</span>
             </label>
           </div>
         )}

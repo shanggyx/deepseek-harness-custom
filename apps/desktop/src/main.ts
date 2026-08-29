@@ -46,8 +46,8 @@ const ZOOM_STEP = 0.5
 /** The userData file holding the imported background image (raw bytes, no extension). */
 const BACKGROUND_IMAGE_FILE = 'background-image'
 
-/** The app-protocol URL the page loads the imported image from. */
-export const BACKGROUND_IMAGE_URL = 'app://background-image'
+/** The app-protocol URL prefix the page loads the imported image from; each import appends a cache-busting version. */
+const BACKGROUND_IMAGE_URL = 'app://background-image'
 
 /** Largest accepted imported background image. */
 const MAX_BACKGROUND_BYTES = 30 * 1024 * 1024
@@ -367,9 +367,11 @@ async function boot(): Promise<void> {
     const url = new URL(request.url)
     if (url.host !== 'background-image') return new Response('not found', { status: 404 })
     // ENOENT before any import: the page has no background configured anyway.
+    // no-store: a re-import changes the bytes under the same path, and the
+    // versioned import URL alone cannot reach already-open pages.
     try {
       const bytes = readFileSync(path.join(app.getPath('userData'), BACKGROUND_IMAGE_FILE))
-      return new Response(bytes, { headers: { 'content-type': detectImageMime(bytes) } })
+      return new Response(bytes, { headers: { 'content-type': detectImageMime(bytes), 'cache-control': 'no-store' } })
     } catch {
       return new Response('not found', { status: 404 })
     }
@@ -385,7 +387,9 @@ async function boot(): Promise<void> {
     const dir = app.getPath('userData')
     mkdirSync(dir, { recursive: true })
     writeFileSync(path.join(dir, BACKGROUND_IMAGE_FILE), view)
-    return BACKGROUND_IMAGE_URL
+    // The versioned URL defeats the renderer's image cache, so a re-import
+    // replaces the visible background without a reload.
+    return `${BACKGROUND_IMAGE_URL}?v=${String(Date.now())}`
   })
   const started = spawnDsh()
   let url: URL
