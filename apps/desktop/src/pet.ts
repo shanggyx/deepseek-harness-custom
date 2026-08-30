@@ -21,8 +21,8 @@ export interface PetBalanceState {
 }
 
 /** The pet stage window size (bubble + 名牌 + 小立绘). */
-export const PET_WIDTH = 150
-export const PET_HEIGHT = 290
+export const PET_WIDTH = 170
+export const PET_HEIGHT = 340
 
 /**
  * The page-side call the main process makes after every state change: the

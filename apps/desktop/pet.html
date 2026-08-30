@@ -3,7 +3,7 @@
   /* 桌宠样式以 DViridescent/dafy-whale-theme 的 dafy-mascot 为准：
      小立绘 + 浮动摇摆 + 悬停放大 + 点击吐槽气泡 + 下方名牌。 */
   html, body { margin: 0; background: transparent; overflow: hidden; }
-  .stage { position: relative; width: 150px; height: 290px;
+  .stage { position: relative; width: 170px; height: 340px;
     -webkit-app-region: drag; user-select: none; }
   .mascot { position: absolute; left: 50%; bottom: 30px; width: 108px;
     margin-left: -54px; -webkit-app-region: no-drag; cursor: pointer;
@@ -30,22 +30,22 @@
      吐槽短语显示期间由 JS 反向隐藏它们。 */
   .bubble .b-balance, .bubble .b-sub { display: none; }
   .stage:hover .bubble .b-balance, .stage:hover .bubble .b-sub { display: block; }
-  .bubble { position: absolute; bottom: calc(100% + 10px); right: -10px;
-    width: 200px; padding: 8px 12px; border-radius: 14px;
+  .bubble { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+    width: 150px; padding: 8px 12px; border-radius: 14px;
     background: rgba(24, 26, 32, 0.92); color: #e8eaf0;
     border: 1px solid rgba(255, 255, 255, 0.18);
     font: 12.5px/1.5 'Segoe UI', 'Microsoft YaHei', sans-serif; text-align: left;
     box-shadow: 0 8px 24px rgba(20, 60, 140, 0.2);
     animation: dafy-pop 0.22s ease; }
   .bubble::after {
-    content: ''; position: absolute; top: 100%; right: 38px;
+    content: ''; position: absolute; top: 100%; left: 50%; margin-left: -7px;
     border: 7px solid transparent; border-top-color: rgba(255, 255, 255, 0.18); }
   .bubble .b-balance { font-size: 15px; font-weight: 600;
     font-variant-numeric: tabular-nums; }
   .bubble .b-sub { font-size: 10px; opacity: 0.6; }
   .bubble .b-phrase { white-space: normal; }
   .bubble .b-phrase[data-active="true"] { display: block; }
-  @keyframes dafy-pop { from { transform: translateY(8px) scale(0.9); opacity: 0; } }
+  @keyframes dafy-pop { from { transform: translateX(-50%) translateY(8px) scale(0.9); opacity: 0; } }
 </style></head><body><div class="stage" id="stage">
   <div class="mascot" id="mascot" title="戳我互动 / 双击看梗图">
     <div class="bubble" id="bubble">
