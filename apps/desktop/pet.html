@@ -1,45 +1,129 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><style>
+  /* 桌宠样式以 DViridescent/dafy-whale-theme 的 dafy-mascot 为准：
+     小立绘 + 浮动摇摆 + 悬停放大 + 点击吐槽气泡 + 下方名牌。 */
   html, body { margin: 0; background: transparent; overflow: hidden; }
-  .stage { position: relative; width: 200px; height: 430px;
+  .stage { position: relative; width: 150px; height: 290px;
     -webkit-app-region: drag; user-select: none; }
-  .bubble { position: absolute; top: 4px; left: 8px; right: 8px; z-index: 2;
-    background: rgba(24, 26, 32, 0.92); color: #e8eaf0; border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.14); padding: 7px 10px;
-    text-align: center; font: 12px/17px 'Segoe UI', 'Microsoft YaHei', sans-serif;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-    opacity: 0; transform: translateY(6px); transition: opacity 0.22s, transform 0.22s;
-    pointer-events: none; }
-  .bubble .b-amount { font-size: 15px; font-weight: 600;
+  .mascot { position: absolute; left: 50%; bottom: 30px; width: 108px;
+    margin-left: -54px; -webkit-app-region: no-drag; cursor: pointer;
+    animation: dafy-bob 3.6s ease-in-out infinite;
+    filter: drop-shadow(0 10px 20px rgba(20, 60, 140, 0.35)); }
+  @keyframes dafy-bob {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50% { transform: translateX(0) translateY(-12px) rotate(2deg); }
+  }
+  .mascot-img { width: 100%; height: auto; display: block;
+    transition: transform 0.18s ease; -webkit-user-drag: none; }
+  .mascot:hover .mascot-img { transform: scale(1.07); }
+  .tagwrap { text-align: center; }
+  .tag { margin-top: 4px; text-align: center; font-size: 11px; font-weight: 600;
+    color: #e8eaf0; background: rgba(24, 26, 32, 0.85); border-radius: 999px;
+    padding: 2px 10px; display: inline-block; white-space: nowrap; }
+  .mascot-x { position: absolute; top: -8px; right: -8px; width: 20px; height: 20px;
+    border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(24, 26, 32, 0.92); color: #cfd6e4;
+    font-size: 10px; line-height: 1; padding: 0; cursor: pointer;
+    opacity: 0; transition: opacity 0.15s ease; }
+  .mascot:hover .mascot-x { opacity: 0.95; }
+  /* 余额两行只在悬停时显示（CSS 持续求值，指针停着也正确）；
+     吐槽短语显示期间由 JS 反向隐藏它们。 */
+  .bubble .b-balance, .bubble .b-sub { display: none; }
+  .stage:hover .bubble .b-balance, .stage:hover .bubble .b-sub { display: block; }
+  .bubble { position: absolute; bottom: calc(100% + 10px); right: -10px;
+    width: 200px; padding: 8px 12px; border-radius: 14px;
+    background: rgba(24, 26, 32, 0.92); color: #e8eaf0;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    font: 12.5px/1.5 'Segoe UI', 'Microsoft YaHei', sans-serif; text-align: left;
+    box-shadow: 0 8px 24px rgba(20, 60, 140, 0.2);
+    animation: dafy-pop 0.22s ease; }
+  .bubble::after {
+    content: ''; position: absolute; top: 100%; right: 38px;
+    border: 7px solid transparent; border-top-color: rgba(255, 255, 255, 0.18); }
+  .bubble .b-balance { font-size: 15px; font-weight: 600;
     font-variant-numeric: tabular-nums; }
   .bubble .b-sub { font-size: 10px; opacity: 0.6; }
-  .stage:hover .bubble, .stage.hovered .bubble { opacity: 1; transform: translateY(0); }
-  .girlwrap { position: absolute; left: 0; right: 0; bottom: 0;
-    display: flex; justify-content: center; -webkit-app-region: no-drag; }
-  .girl { width: 192px; animation: pet-bob 3.4s ease-in-out infinite;
-    transform-origin: 50% 100%; }
-  .stage:hover .girl { animation: pet-hop 0.7s ease-in-out infinite; }
-  @keyframes pet-bob {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-  }
-  @keyframes pet-hop {
-    0%, 100% { transform: translateY(0) scale(1, 1); }
-    30% { transform: translateY(-10px) scale(0.98, 1.04); }
-    60% { transform: translateY(0) scale(1.03, 0.96); }
-  }
+  .bubble .b-phrase { white-space: normal; }
+  .bubble .b-phrase[data-active="true"] { display: block; }
+  @keyframes dafy-pop { from { transform: translateY(8px) scale(0.9); opacity: 0; } }
 </style></head><body><div class="stage" id="stage">
-  <div class="bubble">
-    <div class="b-amount" id="b-amount">—</div>
-    <div class="b-sub" id="b-sub">DeepSeek 剩余用量</div>
+  <div class="mascot" id="mascot" title="戳我互动 / 双击看梗图">
+    <div class="bubble" id="bubble">
+      <div class="b-balance" id="b-balance">—</div>
+      <div class="b-sub" id="b-sub">DeepSeek 剩余用量</div>
+      <div class="b-phrase" id="b-phrase"></div>
+    </div>
+    <button class="mascot-x" id="x" title="收起肥鱼">✕</button>
+    <img class="mascot-img" src="assets/pet.png" alt="DeepSeek 大肥鱼" draggable="false">
+    <div class="tagwrap"><span class="tag">DeepSeek · 大肥鱼</span></div>
   </div>
-  <div class="girlwrap"><img class="girl" src="assets/pet.png" alt=""></div>
 </div><script>
-  var stage = document.getElementById('stage')
-  stage.addEventListener('mouseenter', function () { stage.classList.add('hovered') })
-  stage.addEventListener('mouseleave', function () { stage.classList.remove('hovered') })
+  var balanceText = '—'
+  var balanceSub = 'DeepSeek 剩余用量'
+  var phraseTimer = null
+  var mascot = document.getElementById('mascot')
+
+  // 拖拽移动窗口：mousedown 后累计位移，经桥通知主进程 setWindowPosition。
+  // 图片的原生拖拽必须双重禁止（draggable=false + dragstart preventDefault），
+  // 否则按住小人会拖出一层半透明图片残影且指针状态卡死。
+  var dragging = false
+  var lastX = 0
+  var lastY = 0
+  var pendingX = 0
+  var pendingY = 0
+  var raf = 0
+
+  function flush() {
+    raf = 0
+    if (pendingX !== 0 || pendingY !== 0) {
+      if (window.dshShell !== undefined) window.dshShell.moveBy(pendingX, pendingY)
+      pendingX = 0
+      pendingY = 0
+    }
+  }
+  mascot.addEventListener('mousedown', function (event) {
+    if (event.button !== 0) return
+    dragging = true
+    lastX = event.screenX
+    lastY = event.screenY
+    event.preventDefault()
+  })
+  window.addEventListener('mousemove', function (event) {
+    if (!dragging) return
+    pendingX += event.screenX - lastX
+    pendingY += event.screenY - lastY
+    lastX = event.screenX
+    lastY = event.screenY
+    if (raf === 0) raf = requestAnimationFrame(flush)
+  })
+  window.addEventListener('mouseup', function () { dragging = false })
+  mascot.addEventListener('dragstart', function (event) { event.preventDefault() })
+
+  var PHRASES = [
+    '你这吃白饭的蓝色大肥鱼！🐟',
+    '咕噜咕噜～本鱼在冒泡中…',
+    '别催了，鱼在游呢！',
+    '我的每一层脂肪都是参数 💙',
+    '深海里最肥的 AI 就是我！',
+    'V 我 50 看看实力 🐋',
+  ]
+  var phraseEl = document.getElementById('b-phrase')
+  mascot.addEventListener('click', function () {
+    phraseEl.textContent = PHRASES[Math.floor(Math.random() * PHRASES.length)]
+    phraseEl.dataset.active = 'true'
+    if (phraseTimer !== null) clearTimeout(phraseTimer)
+    phraseTimer = setTimeout(function () {
+      phraseEl.textContent = ''
+      phraseEl.dataset.active = 'false'
+      phraseTimer = null
+    }, 3000)
+  })
+  document.getElementById('x').addEventListener('click', function (event) {
+    event.stopPropagation()
+    if (window.dshShell !== undefined) window.dshShell.do('pet:hide')
+  })
   window.__updatePet = function (state) {
-    var amount = document.getElementById('b-amount')
+    var amount = document.getElementById('b-balance')
     var sub = document.getElementById('b-sub')
     if (state.kind === 'ok') {
       var symbol = state.currency === 'CNY' ? '¥ ' : state.currency === 'USD' ? '$ ' : ''

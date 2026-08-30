@@ -20,9 +20,9 @@ export interface PetBalanceState {
   message?: string | undefined
 }
 
-/** The pet stage window size (bubble airspace above the girl included). */
-export const PET_WIDTH = 210
-export const PET_HEIGHT = 250
+/** The pet stage window size (bubble + 名牌 + 小立绘). */
+export const PET_WIDTH = 150
+export const PET_HEIGHT = 290
 
 /**
  * The page-side call the main process makes after every state change: the

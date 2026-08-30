@@ -26,6 +26,15 @@ contextBridge.exposeInMainWorld('dshShell', {
     })
   },
   /**
+   * Nudge the pet window by a screen-pixel delta (the drag-by-the-body path:
+   * the renderer tracks the pointer and streams small deltas here).
+   * @param dx - horizontal delta.
+   * @param dy - vertical delta.
+   */
+  moveBy(dx, dy) {
+    ipcRenderer.send('pet:move-by', { dx: Number(dx), dy: Number(dy) })
+  },
+  /**
    * Store an imported background image and resolve to the app-protocol URL
    * the served page loads it from.
    * @param bytes - the image bytes.

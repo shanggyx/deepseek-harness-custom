@@ -289,8 +289,8 @@ function showPet(): void {
   petWindow = new BrowserWindow({
     width: PET_WIDTH,
     height: PET_HEIGHT,
-    x: workArea.x + workArea.width - PET_WIDTH - 12,
-    y: workArea.y + Math.round(workArea.height / 2 - PET_HEIGHT / 2),
+    x: workArea.x + workArea.width - PET_WIDTH - 16,
+    y: workArea.y + workArea.height - PET_HEIGHT - 96,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -482,6 +482,14 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', focusWindow)
   app.on('window-all-closed', () => { app.quit() })
   app.on('before-quit', stopChild)
+  ipcMain.on('pet:move-by', (_event, delta: unknown) => {
+    if (petWindow === undefined || petWindow.isDestroyed()) return
+    const d = delta as { dx?: unknown; dy?: unknown }
+    if (typeof d.dx !== 'number' || typeof d.dy !== 'number' || (d.dx === 0 && d.dy === 0)) return
+    const [x, y] = petWindow.getPosition()
+    if (x === undefined || y === undefined) return
+    petWindow.setPosition(x + Math.round(d.dx), y + Math.round(d.dy))
+  })
   ipcMain.on('shell:action', (_event, action: unknown) => {
     if (typeof action === 'string') runShellAction(action)
   })
