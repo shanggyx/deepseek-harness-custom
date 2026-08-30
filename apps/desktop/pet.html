@@ -13,9 +13,9 @@
   .bubble .b-amount { font-size: 15px; font-weight: 600;
     font-variant-numeric: tabular-nums; }
   .bubble .b-sub { font-size: 10px; opacity: 0.6; }
-  .stage:hover .bubble { opacity: 1; transform: translateY(0); }
+  .stage:hover .bubble, .stage.hovered .bubble { opacity: 1; transform: translateY(0); }
   .girlwrap { position: absolute; left: 0; right: 0; bottom: 0;
-    display: flex; justify-content: center; }
+    display: flex; justify-content: center; -webkit-app-region: no-drag; }
   .girl { width: 192px; animation: pet-bob 3.4s ease-in-out infinite;
     transform-origin: 50% 100%; }
   .stage:hover .girl { animation: pet-hop 0.7s ease-in-out infinite; }
@@ -35,6 +35,9 @@
   </div>
   <div class="girlwrap"><img class="girl" src="assets/pet.png" alt=""></div>
 </div><script>
+  var stage = document.getElementById('stage')
+  stage.addEventListener('mouseenter', function () { stage.classList.add('hovered') })
+  stage.addEventListener('mouseleave', function () { stage.classList.remove('hovered') })
   window.__updatePet = function (state) {
     var amount = document.getElementById('b-amount')
     var sub = document.getElementById('b-sub')
