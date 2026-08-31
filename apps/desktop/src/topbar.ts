@@ -240,8 +240,10 @@ export const TOPBAR_SCRIPT = String.raw`(function () {
         el.style.boxSizing = 'border-box'
         var panel = el.querySelector('[class*="panel"]')
         if (panel !== null) {
-          panel.style.height = 'auto'
-          panel.style.maxHeight = 'calc(100vh - 82px)'
+          // 固定高度（以最高的分区为准，内容在 .options 里滚动），
+          // 不随页签切换伸缩。
+          panel.style.height = 'min(800px, calc(100vh - 116px))'
+          panel.style.maxHeight = ''
         }
       })
     }
