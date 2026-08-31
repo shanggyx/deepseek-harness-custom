@@ -29,6 +29,8 @@ import { SubagentModelSelectionCard } from './SubagentModelSelectionCard.tsx'
 import { WebSearchCard } from './WebSearchCard.tsx'
 import { AGENT_LOOP_NS, AgentLoopCardController } from './agent-loop-card-controller.ts'
 import { SHELL_NS, BashCardController } from './bash-card-controller.ts'
+import { SSH_NS, createSshHostsCardController } from './ssh-hosts-card-controller.ts'
+import { SshHostsCard } from './SshHostsCard.tsx'
 import { ConfigurablePluginsTabController } from './tab-store.ts'
 import {
   SUBAGENT_MODEL_SELECTION_NS, SubagentModelSelectionCardController,
@@ -73,6 +75,7 @@ export function apply(ctx: ClientContext): void {
     ctx.settingsScope.bind({ namespace: SUBAGENT_MODEL_SELECTION_NS }),
     ctx.remote.session,
   )
+  const sshHosts = createSshHostsCardController(ctx.settingsScope.bind({ namespace: SSH_NS }))
 
   // The credential a card reports is not part of any settings section, so its
   // scope publishes nothing when one is written. This is the only signal that
@@ -171,6 +174,12 @@ export function apply(ctx: ClientContext): void {
       locale: NS,
       inject: () => bash.inject(),
     }, BashCard)
+    yield ctx.slots.register({
+      name: 'settings.plugin.item',
+      key: SSH_NS,
+      locale: NS,
+      inject: () => sshHosts.inject(),
+    }, SshHostsCard)
     yield ctx.slots.register({
       name: 'settings.plugin.item',
       key: AGENT_LOOP_NS,

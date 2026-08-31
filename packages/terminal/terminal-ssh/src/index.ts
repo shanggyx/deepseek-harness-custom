@@ -5,6 +5,11 @@
  * banner, password prompts, and the remote shell are all driven by the
  * owner's sends, so password-authenticated hosts work without storing
  * secrets. Remote execution is deliberately outside the local sandbox.
+ *
+ * Hosts come from two places merged by name (settings wins): the plugin
+ * configuration (composition ships defaults) and the user-managed
+ * `terminal-ssh` settings section (the GUI the settings plugins surface
+ * edits). Settings changes re-register the affected backends in place.
  * @module @deepseek-ai/dsh-terminal-ssh
  */
 
@@ -13,9 +18,14 @@ import type { TerminalBackend, TerminalBackendSession, TerminalBackendSpawnSpec 
 import { LocalPtySession, resolveConfig, type ResolvedConfig } from '@deepseek-ai/dsh-terminal-bash'
 import type { SubprocessTerminalHandle, SubprocessTerminalSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { resolveHosts, type Config, type SshHostConfig } from './config.ts'
+import {
+  SshHostsSettingsSchema, sshSettingsNamespace, type SshHostsDocument,
+} from './settings.ts'
 
 export { Config, resolveHosts } from './config.ts'
 export type { SshHostConfig } from './config.ts'
+export { SSH_SETTINGS_NAMESPACE, sshSettingsNamespace, SshHostsSettingsSchema } from './settings.ts'
+export type { SshHostsDocument } from './settings.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'terminal-ssh'
@@ -71,16 +81,81 @@ export class SshTerminalBackend implements TerminalBackend {
 }
 
 /**
- * Register one SSH backend per configured host.
+ * Merge the two host sources by name: composition hosts ship defaults, the
+ * settings document carries user-managed entries, and a settings entry
+ * replaces a composition host of the same name.
+ * @param composition - hosts from the plugin configuration.
+ * @param managed - hosts from the user settings document.
+ * @returns the merged roster in insertion order (composition first).
+ */
+function mergeHosts(composition: readonly SshHostConfig[], managed: readonly SshHostConfig[]): SshHostConfig[] {
+  const byName = new Map<string, SshHostConfig>()
+  for (const host of composition) byName.set(host.name, host)
+  for (const host of managed) byName.set(host.name, host)
+  return [...byName.values()]
+}
+
+/**
+ * Register one SSH backend per host (composition hosts merged with the
+ * user-managed settings hosts), replacing the previous registration set.
+ * @param ctx - plugin context carrying the terminals registry and subprocess seam.
+ * @param sessionConfig - shared PTY tuning for every spawned session.
+ * @param hosts - the merged host roster.
+ * @param disposers - mutable disposer bag for the current registrations.
+ */
+function registerBackends(
+  ctx: Context,
+  sessionConfig: ResolvedConfig & { cwd: string },
+  hosts: readonly SshHostConfig[],
+  disposers: (() => void)[],
+): void {
+  for (const dispose of disposers.splice(0)) dispose()
+  for (const host of hosts) {
+    disposers.push(
+      ctx.terminals.registerBackend(
+        new SshTerminalBackend(host, sessionConfig, async spec => ctx.subprocess.spawnTerminal(spec)),
+      ),
+    )
+  }
+}
+
+/**
+ * Register the SSH backends and keep them in step with the user settings
+ * document. Composition hosts ship defaults; the settings document carries
+ * the user's own hosts and wins per name.
  * @param ctx - plugin context carrying the terminals registry and subprocess seam.
  * @param config - validated plugin configuration.
  */
 export function apply(ctx: Context, config: Config): void {
-  const sessionConfig = {
+  const sessionConfig: ResolvedConfig & { cwd: string } = {
     ...resolveConfig(config),
     cwd: process.cwd(),
   }
-  for (const host of resolveHosts(config)) {
-    ctx.terminals.registerBackend(new SshTerminalBackend(host, sessionConfig, async spec => ctx.subprocess.spawnTerminal(spec)))
-  }
+  const compositionHosts = resolveHosts(config)
+  const disposers: (() => void)[] = []
+  registerBackends(ctx, sessionConfig, compositionHosts, disposers)
+
+  // The user settings document carries the GUI-managed hosts; a refresh
+  // (commit from the settings UI) re-registers the merged roster in place.
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.register(sshSettingsNamespace, SshHostsSettingsSchema)
+    const readManaged = (): SshHostConfig[] => {
+      const document = settingsCtx.settings.get(sshSettingsNamespace) as SshHostsDocument | undefined
+      return document?.hosts ?? []
+    }
+    const rebind = (): void => {
+      const previous = disposers.splice(0)
+      const hosts = mergeHosts(compositionHosts, readManaged())
+      for (const host of hosts) {
+        disposers.push(
+          ctx.terminals.registerBackend(
+            new SshTerminalBackend(host, sessionConfig, async spec => ctx.subprocess.spawnTerminal(spec)),
+          ),
+        )
+      }
+      for (const dispose of previous) dispose()
+    }
+    settingsCtx.on('settings/document-updated', rebind)
+    rebind()
+  })
 }

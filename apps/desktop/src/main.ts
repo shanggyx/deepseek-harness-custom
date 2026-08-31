@@ -140,8 +140,8 @@ function awaitReadyUrl(started: ChildProcess): Promise<URL> {
       const url = parseReadyUrl(line)
       if (url !== undefined) finish(() => { resolve(url) })
     }
-    const onExit = (): void => finish(() => { reject(new Error('dsh exited before printing its readiness URL')) })
-    const onError = (error: Error): void => finish(() => { reject(new Error(`dsh could not be launched: ${error.message}`)) })
+    const onExit = (): void =>{  finish(() => { reject(new Error('dsh exited before printing its readiness URL')) }) }
+    const onError = (error: Error): void =>{  finish(() => { reject(new Error(`dsh could not be launched: ${error.message}`)) }) }
     lines.on('line', onLine)
     started.once('exit', onExit)
     started.once('error', onError)
@@ -426,7 +426,7 @@ function installKeyboardMap(window: BrowserWindow): void {
       return
     }
     const key = input.key.toLowerCase()
-    const plain = input.shift === false
+    const plain = ! input.shift
     switch (key) {
       case 'n':
         if (plain) { event.preventDefault(); clickInRenderer('[class*="newSession"]') }

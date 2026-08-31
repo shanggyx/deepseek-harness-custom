@@ -17,6 +17,7 @@ export type PluginsSettingsLocaleKey =
   | 'subagentModelSelectionPartial' | 'subagentModelSelectionUnavailable'
   | 'subagentModelSelectionUnavailableGroup' | 'subagentModelSelectionEmpty'
   | 'subagentModelSelectionRequired' | 'subagentModelSelectionConflict' | 'subagentModelSelectionOff'
+  | 'sshTitle' | 'sshHint' | 'sshName' | 'sshHost' | 'sshPort' | 'sshUser' | 'sshIdentity' | 'sshRemove' | 'sshAdd' | 'sshSave'
 
 /** English copy. */
 export const en: Record<PluginsSettingsLocaleKey, string> = {
@@ -72,6 +73,16 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   subagentModelSelectionRequired: 'Select at least one model before saving.',
   subagentModelSelectionConflict: 'Settings changed elsewhere. Discard your draft and try again.',
   subagentModelSelectionOff: 'Subagents use configured defaults or inherit the parent agent\'s model. Saved model choices are retained.',
+  'sshTitle': 'SSH remote hosts',
+  'sshHint': 'The agent connects to these hosts through persistent terminal sessions',
+  'sshName': 'Name',
+  'sshHost': 'Host',
+  'sshPort': 'Port',
+  'sshUser': 'User',
+  'sshIdentity': 'Identity file',
+  'sshRemove': 'Remove this host',
+  'sshAdd': 'Add host',
+  'sshSave': 'Save',
 }
 
 /** Simplified Chinese copy. */
@@ -128,4 +139,14 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   subagentModelSelectionRequired: '保存前请至少选择一个模型。',
   subagentModelSelectionConflict: '设置已在其他位置更新。请放弃修改后重试。',
   subagentModelSelectionOff: '关闭后，Subagent 使用配置的默认模型或继承父 Agent 的模型；已选模型会保留。',
+  'sshTitle': 'SSH 远程主机',
+  'sshHint': 'agent 可通过持久终端会话连接这些主机',
+  'sshName': '名称',
+  'sshHost': '主机',
+  'sshPort': '端口',
+  'sshUser': '用户',
+  'sshIdentity': '密钥路径',
+  'sshRemove': '删除此主机',
+  'sshAdd': '添加主机',
+  'sshSave': '保存',
 }
