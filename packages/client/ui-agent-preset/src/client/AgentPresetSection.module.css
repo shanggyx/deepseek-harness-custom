@@ -462,3 +462,16 @@
   opacity: 0.4;
   cursor: default;
 }
+
+/* Roster loading hint: one quiet line while the host enumerates presets. */
+.loadingLine {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+  animation: preset-loading-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes preset-loading-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}

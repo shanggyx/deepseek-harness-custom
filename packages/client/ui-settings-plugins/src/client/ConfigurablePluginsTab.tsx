@@ -39,5 +39,12 @@ export function ConfigurablePluginsTab(props: ConfigurablePluginsTabProps) {
       </ul>
     )
   }
-  return loaded ? <p className={css.empty}>{t('empty')}</p> : null
+  if (!loaded) {
+    return (
+      <p className={css.skeleton} aria-busy="true">
+        <span /><span /><span />
+      </p>
+    )
+  }
+  return <p className={css.empty}>{t('empty')}</p>
 }
