@@ -72,6 +72,8 @@ function repoRoot(): string {
 
 /** The running dsh child, from spawn until its exit or the shell's shutdown. */
 let child: ChildProcess | undefined
+/** Set while a quit is in flight, so the main window's close handler lets the final close through. */
+const quitting = false
 /** The main window; the pet card is a secondary surface that never outlives it. */
 let mainWindow: BrowserWindow | undefined
 /** Set once a shutdown is intentional, so the child's exit stops being an error to surface. */
@@ -195,9 +197,14 @@ function createWindow(): BrowserWindow {
   })
   // Hidden until first paint: no blank or unthemed frame ever shows.
   window.once('ready-to-show', () => { window.show() })
-  window.on('close', () => { saveBounds(window.getBounds()) })
-  // Closing the main window IS quitting the app: the pet card is a secondary
-  // surface and must never strand the session without a way back.
+  window.on('close', (event) => {
+    saveBounds(window.getBounds())
+    // 常驻模式：关主窗口 = 收起界面，后台服务与桌宠继续跑；双击图标秒回。
+    if (keepAliveEnabled() && !quitting) {
+      event.preventDefault()
+      window.hide()
+    }
+  })
   window.on('closed', () => {
     mainWindow = undefined
     app.quit()
@@ -213,6 +220,28 @@ function focusWindow(): void {
   if (window.isMinimized()) window.restore()
   window.show()
   window.focus()
+}
+
+/** Saved shell preferences; a missing or corrupt file means all defaults. */
+function loadPrefs(): { keepAlive: boolean } {
+  // 坏文件只损失偏好，不给启动添堵。
+  try {
+    const parsed = JSON.parse(readFileSync(path.join(app.getPath('userData'), 'desktop-prefs.json'), 'utf8')) as { keepAlive?: unknown }
+    return { keepAlive: parsed['keepAlive'] !== false }
+  } catch {
+    return { keepAlive: true }
+  }
+}
+
+function savePrefs(prefs: { keepAlive: boolean }): void {
+  const dir = app.getPath('userData')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(path.join(dir, 'desktop-prefs.json'), JSON.stringify(prefs))
+}
+
+/** Whether closing the main window should keep the background service running. */
+function keepAliveEnabled(): boolean {
+  return loadPrefs().keepAlive
 }
 
 /** The window a menu command acts on: the main window, else the focused one. */
@@ -371,6 +400,12 @@ function runShellAction(action: string): void {
     case 'pet:toggle': runPetAction('pet:toggle'); break
     case 'pet:hide': runPetAction('pet:hide'); break
     case 'pet:refresh': runPetAction('pet:refresh'); break
+    case 'keepalive:toggle': {
+      const prefs = loadPrefs()
+      prefs.keepAlive = !prefs.keepAlive
+      savePrefs(prefs)
+      break
+    }
     default: break
   }
 }

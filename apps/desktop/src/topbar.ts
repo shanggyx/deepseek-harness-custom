@@ -82,6 +82,7 @@ export const TOPBAR_SCRIPT = String.raw`(function () {
     { name: '帮助', items: [
       { label: '关于 dsh', action: 'main', main: 'about' },
       { label: '显示/隐藏 DeepSeek 桌宠', action: 'main', main: 'pet:toggle' },
+      { label: '关窗后保留后台服务（点按切换）', action: 'main', main: 'keepalive:toggle' },
       { label: '刷新桌宠余额', action: 'main', main: 'pet:refresh' },
       { label: '上游仓库', action: 'main', main: 'upstream' },
     ] },
