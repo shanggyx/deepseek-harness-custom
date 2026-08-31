@@ -19,6 +19,7 @@ import { CONTROLLED_PROMPT } from './sanitize.ts'
 
 export { Config } from './config.ts'
 export type { Config as TerminalLocalConfig } from './config.ts'
+export { resolveConfig, type ResolvedConfig } from './config.ts'
 
 /** Cordis plugin name. */
 export const name = 'terminal-bash'
@@ -86,6 +87,7 @@ function childEnvironment(spec: TerminalBackendSpawnSpec, dialect: ShellDialect)
  * build the control bytes at runtime because raw ESC characters in submitted
  * input are unreliable under PSReadLine.
  */
+export { LocalPtySession } from './session.ts'
 export const PWSH_PROMPT_SETUP =
   "function prompt { [Console]::Write([char]27 + ']133;D;' + [int]$LASTEXITCODE + [char]7); '" + CONTROLLED_PROMPT + "' }"
 

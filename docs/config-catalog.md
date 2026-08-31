@@ -2616,6 +2616,63 @@ export type ShellDialect = 'bash' | 'pwsh'
 
 Source: [`packages/terminal/terminal-bash/src/config.ts:10`](../packages/terminal/terminal-bash/src/config.ts)
 
+<a id="deepseek-aidsh-terminal-ssh"></a>
+
+## `@deepseek-ai/dsh-terminal-ssh`
+
+Requires: `terminals` · `subprocess`
+
+```ts config-catalog
+/** Public plugin configuration. */
+export interface Config {
+  /** Configured SSH hosts; each registers one `ssh:<name>` backend. */
+  hosts?: SshHostConfig[]
+  /** Terminal rows. */
+  rows?: number
+  /** Terminal columns. */
+  cols?: number
+  /** Maximum retained logical lines. */
+  scrollbackLines?: number
+  /** Maximum retained UTF-8 bytes. */
+  scrollbackMaxBytes?: number
+  /** Maximum bytes returned by one read or settled viewport. */
+  maxReadBytes?: number
+  /** Readiness polling interval. */
+  pollIntervalMs?: number
+  /** Delay before Linux exact syscall probes. */
+  exactProbeAfterMs?: number
+  /** Silence duration that yields `inferred_idle`. */
+  idleSilenceMs?: number
+  /**
+   * Extra wait beyond `idleSilenceMs`, once a prompt marker was seen, for the shell to
+   * regain the foreground before `inferred_idle` settles; at least one `pollIntervalMs`.
+   */
+  handoffGraceMs?: number
+  /** Absolute bound for one send. */
+  timeoutMs?: number
+  /** Grace before teardown escalates to `SIGKILL`. */
+  disposeGraceMs?: number
+  /** Local process working directory for the ssh client (carries no remote meaning). */
+  cwd?: string
+}
+
+/** One configured SSH host; the backend type is `ssh:<name>`. */
+export interface SshHostConfig {
+  /** Registry-unique backend suffix (`ssh:<name>`). */
+  name: string
+  /** Remote host name or IP. */
+  host: string
+  /** Remote SSH port. */
+  port: number
+  /** Remote login user. */
+  username: string
+  /** Optional explicit identity file; ssh's default identities are always tried first. */
+  identityFile?: string
+}
+```
+
+Source: [`packages/terminal/terminal-ssh/src/config.ts:20`](../packages/terminal/terminal-ssh/src/config.ts)
+
 <a id="deepseek-aidsh-time-context"></a>
 
 ## `@deepseek-ai/dsh-time-context`
@@ -3245,7 +3302,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/bundle/web-app/src/index.ts:45`](../packages/bundle/web-app/src/index.ts)
+Source: [`packages/bundle/web-app/src/index.ts:50`](../packages/bundle/web-app/src/index.ts)
 
 <a id="deepseek-aidsh-web-fetch-http"></a>
 
