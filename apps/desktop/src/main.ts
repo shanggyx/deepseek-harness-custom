@@ -72,6 +72,8 @@ function repoRoot(): string {
 
 /** The running dsh child, from spawn until its exit or the shell's shutdown. */
 let child: ChildProcess | undefined
+/** The main window; the pet card is a secondary surface that never outlives it. */
+let mainWindow: BrowserWindow | undefined
 /** Set once a shutdown is intentional, so the child's exit stops being an error to surface. */
 let shuttingDown = false
 /**
@@ -194,19 +196,28 @@ function createWindow(): BrowserWindow {
   // Hidden until first paint: no blank or unthemed frame ever shows.
   window.once('ready-to-show', () => { window.show() })
   window.on('close', () => { saveBounds(window.getBounds()) })
+  // Closing the main window IS quitting the app: the pet card is a secondary
+  // surface and must never strand the session without a way back.
+  window.on('closed', () => {
+    mainWindow = undefined
+    app.quit()
+  })
+  mainWindow = window
   return window
 }
 
 /** Focus the existing shell's window; a second launch joins the first. */
 function focusWindow(): void {
-  const window = BrowserWindow.getAllWindows()[0]
+  const window = mainWindow !== undefined && !mainWindow.isDestroyed() ? mainWindow : BrowserWindow.getAllWindows()[0]
   if (window === undefined) return
   if (window.isMinimized()) window.restore()
+  window.show()
   window.focus()
 }
 
-/** The window a menu command acts on: the focused one, else the only window. */
+/** The window a menu command acts on: the main window, else the focused one. */
 function activeWindow(): BrowserWindow | undefined {
+  if (mainWindow !== undefined && !mainWindow.isDestroyed()) return mainWindow
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
 }
 
