@@ -73,7 +73,7 @@ function repoRoot(): string {
 /** The running dsh child, from spawn until its exit or the shell's shutdown. */
 let child: ChildProcess | undefined
 /** Set while a quit is in flight, so the main window's close handler lets the final close through. */
-const quitting = false
+let quitting = false
 /** The main window; the pet card is a secondary surface that never outlives it. */
 let mainWindow: BrowserWindow | undefined
 /** Set once a shutdown is intentional, so the child's exit stops being an error to surface. */
@@ -527,7 +527,12 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', focusWindow)
   app.on('window-all-closed', () => { app.quit() })
-  app.on('before-quit', stopChild)
+  app.on('before-quit', () => {
+    // The keep-alive close handler hides instead of closing; an intentional
+    // quit must let the final close through or the app never exits.
+    quitting = true
+    stopChild()
+  })
   ipcMain.on('pet:move-by', (_event, delta: unknown) => {
     if (petWindow === undefined || petWindow.isDestroyed()) return
     const d = delta as { dx?: unknown; dy?: unknown }

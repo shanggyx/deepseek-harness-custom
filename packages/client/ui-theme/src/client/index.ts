@@ -298,9 +298,9 @@ export class ThemeRuntime {
     if (section === undefined) return
     const background: BackgroundSettings = {
       mode: isBackgroundMode(section.backgroundMode) ? section.backgroundMode : DEFAULT_BACKGROUND_MODE,
-      color: section.backgroundColor ?? DEFAULT_BACKGROUND_COLOR,
-      url: section.backgroundUrl ?? DEFAULT_BACKGROUND_URL,
-      dim: section.backgroundDim ?? DEFAULT_BACKGROUND_DIM,
+      color: section.backgroundColor,
+      url: section.backgroundUrl,
+      dim: section.backgroundDim,
     }
     if (this.preference === section.preference && this.fontSize === section.fontSize
       && this.background.mode === background.mode && this.background.color === background.color

@@ -1,15 +1,18 @@
-/** The SSH plugin's card: manage the remote hosts the agent's terminal tools reach. */
+/** The SSH hosts card: the user-managed roster the agent's terminal tools reach. */
 
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { SshHostsCardInjected } from './ssh-hosts-card-controller.ts'
-import type {} from './slot-contract.ts'
-import css from './ssh-hosts-card.module.css'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SshHostsCardActions, SshHostsCardState } from './ssh-hosts-card-controller.ts'
+import css from './SshHostsCard.module.css'
 
-/** Props the renderer binds for the SSH hosts card. */
-export type SshHostsCardProps =
-  PropsRuntime<'settings.plugin.item'>
-  & PropsLocale<'settings.plugins'>
-  & InjectFace<SshHostsCardInjected>
+/** Props the Connections section binds for the card: copy, snapshot, and actions. */
+export type SshHostsCardProps = {
+  /** Section translate seat. */
+  t: TranslateNS<'settings.connections'>
+  /** The card snapshot. */
+  state: SshHostsCardState
+  /** The card's row and save actions. */
+  actions: SshHostsCardActions
+}
 
 /**
  * Render the SSH hosts card.
@@ -17,8 +20,7 @@ export type SshHostsCardProps =
  * @returns the card.
  */
 export function SshHostsCard(props: SshHostsCardProps) {
-  const { t } = props
-  const state = props.useSshHosts(snapshot => snapshot)
+  const { t, state, actions } = props
   const disabled = !state.writable
   return (
     <div className={css.card}>
@@ -34,7 +36,7 @@ export function SshHostsCard(props: SshHostsCardProps) {
             placeholder="my-server"
             value={row.name}
             disabled={disabled}
-            onChange={(event) => { props.editRow(index, { name: event.target.value }) }}
+            onChange={(event) => { actions.editRow(index, { name: event.target.value }) }}
           />
           <input
             className={css.input}
@@ -42,7 +44,7 @@ export function SshHostsCard(props: SshHostsCardProps) {
             placeholder="host"
             value={row.host}
             disabled={disabled}
-            onChange={(event) => { props.editRow(index, { host: event.target.value }) }}
+            onChange={(event) => { actions.editRow(index, { host: event.target.value }) }}
           />
           <input
             className={css.input}
@@ -50,7 +52,7 @@ export function SshHostsCard(props: SshHostsCardProps) {
             placeholder="22"
             value={String(row.port)}
             disabled={disabled}
-            onChange={(event) => { props.editRow(index, { port: Number.parseInt(event.target.value, 10) || 22 }) }}
+            onChange={(event) => { actions.editRow(index, { port: Number.parseInt(event.target.value, 10) || 22 }) }}
           />
           <input
             className={css.input}
@@ -58,7 +60,7 @@ export function SshHostsCard(props: SshHostsCardProps) {
             placeholder="root"
             value={row.username}
             disabled={disabled}
-            onChange={(event) => { props.editRow(index, { username: event.target.value }) }}
+            onChange={(event) => { actions.editRow(index, { username: event.target.value }) }}
           />
           <input
             className={css.input}
@@ -66,25 +68,26 @@ export function SshHostsCard(props: SshHostsCardProps) {
             placeholder="~/.ssh/id_rsa"
             value={row.identityFile}
             disabled={disabled}
-            onChange={(event) => { props.editRow(index, { identityFile: event.target.value }) }}
+            onChange={(event) => { actions.editRow(index, { identityFile: event.target.value }) }}
           />
           <button
             type="button"
             className={css.remove}
             aria-label={t('sshRemove')}
             disabled={disabled}
-            onClick={() => { props.removeRow(index) }}
+            onClick={() => { actions.removeRow(index) }}
           >
             ✕
           </button>
         </div>
       ))}
+      {state.failed && <span className={css.hint}>{t('sshSaveFailed')}</span>}
       <div className={css.actions}>
         <button
           type="button"
           className={css.secondary}
           disabled={disabled}
-          onClick={() => { props.addRow() }}
+          onClick={() => { actions.addRow() }}
         >
           {t('sshAdd')}
         </button>
@@ -92,7 +95,7 @@ export function SshHostsCard(props: SshHostsCardProps) {
           type="button"
           className={css.secondary}
           disabled={disabled || state.saving}
-          onClick={() => { props.save() }}
+          onClick={() => { actions.save() }}
         >
           {t('sshSave')}
         </button>

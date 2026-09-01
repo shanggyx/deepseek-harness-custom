@@ -135,9 +135,9 @@ describe('ThemeRuntime', () => {
     })
     theme.setBackground({ mode: 'default', color: '', url: '', dim: 60 })
     expect(theme.getTheme().background.mode).toBe('default')
-    expect(() => theme.setBackground({ mode: 'sepia', color: '', url: '', dim: 60 } as never)).toThrow('background mode')
-    expect(() => theme.setBackground({ mode: 'color', color: '', url: '', dim: 60 })).toThrow('needs a color')
-    expect(() => theme.setBackground({ mode: 'image', color: '', url: 'https://x', dim: 91 })).toThrow('outside 0..90')
+    expect(() => { theme.setBackground({ mode: 'sepia', color: '', url: '', dim: 60 } as never) }).toThrow('background mode')
+    expect(() => { theme.setBackground({ mode: 'color', color: '', url: '', dim: 60 }) }).toThrow('needs a color')
+    expect(() => { theme.setBackground({ mode: 'image', color: '', url: 'https://x', dim: 91 }) }).toThrow('outside 0..90')
   })
 
   it('adopts a published background section without writing it back', () => {

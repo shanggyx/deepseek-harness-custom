@@ -196,6 +196,10 @@
     - id: ui-settings-models
       name: '@deepseek-ai/dsh-client-ui-settings-models'
 
+    # Connections: the user-owned SSH remote-host roster on its own settings page.
+    - id: ui-settings-connections
+      name: '@deepseek-ai/dsh-client-ui-settings-connections'
+
     - id: ui-settings-plugin-inventory
       name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'
 

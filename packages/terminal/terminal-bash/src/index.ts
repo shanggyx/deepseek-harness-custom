@@ -81,13 +81,14 @@ function childEnvironment(spec: TerminalBackendSpawnSpec, dialect: ShellDialect)
   }
 }
 
+export { LocalPtySession } from './session.ts'
+
 /**
  * The pwsh prompt function that emits the shared OSC `133;D;` + BEL marker
  * before every prompt, mirroring bash's PROMPT_COMMAND. `[char]27`/`[char]7`
  * build the control bytes at runtime because raw ESC characters in submitted
  * input are unreliable under PSReadLine.
  */
-export { LocalPtySession } from './session.ts'
 export const PWSH_PROMPT_SETUP =
   "function prompt { [Console]::Write([char]27 + ']133;D;' + [int]$LASTEXITCODE + [char]7); '" + CONTROLLED_PROMPT + "' }"
 

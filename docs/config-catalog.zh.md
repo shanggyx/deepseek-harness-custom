@@ -2618,6 +2618,63 @@ export type ShellDialect = 'bash' | 'pwsh'
 
 来源：[`packages/terminal/terminal-bash/src/config.ts:10`](../packages/terminal/terminal-bash/src/config.ts)
 
+<a id="deepseek-aidsh-terminal-ssh"></a>
+
+## `@deepseek-ai/dsh-terminal-ssh`
+
+需要：`terminals` · `subprocess`
+
+```ts config-catalog
+/** Public plugin configuration. */
+export interface Config {
+  /** Configured SSH hosts; each registers one `ssh:<name>` backend. */
+  hosts?: SshHostConfig[]
+  /** Terminal rows. */
+  rows?: number
+  /** Terminal columns. */
+  cols?: number
+  /** Maximum retained logical lines. */
+  scrollbackLines?: number
+  /** Maximum retained UTF-8 bytes. */
+  scrollbackMaxBytes?: number
+  /** Maximum bytes returned by one read or settled viewport. */
+  maxReadBytes?: number
+  /** Readiness polling interval. */
+  pollIntervalMs?: number
+  /** Delay before Linux exact syscall probes. */
+  exactProbeAfterMs?: number
+  /** Silence duration that yields `inferred_idle`. */
+  idleSilenceMs?: number
+  /**
+   * Extra wait beyond `idleSilenceMs`, once a prompt marker was seen, for the shell to
+   * regain the foreground before `inferred_idle` settles; at least one `pollIntervalMs`.
+   */
+  handoffGraceMs?: number
+  /** Absolute bound for one send. */
+  timeoutMs?: number
+  /** Grace before teardown escalates to `SIGKILL`. */
+  disposeGraceMs?: number
+  /** Local process working directory for the ssh client (carries no remote meaning). */
+  cwd?: string
+}
+
+/** One configured SSH host; the backend type is `ssh:<name>`. */
+export interface SshHostConfig {
+  /** Registry-unique backend suffix (`ssh:<name>`). */
+  name: string
+  /** Remote host name or IP. */
+  host: string
+  /** Remote SSH port. */
+  port: number
+  /** Remote login user. */
+  username: string
+  /** Optional explicit identity file; ssh's default identities are always tried first. */
+  identityFile?: string
+}
+```
+
+来源：[`packages/terminal/terminal-ssh/src/config.ts:20`](../packages/terminal/terminal-ssh/src/config.ts)
+
 <a id="deepseek-aidsh-time-context"></a>
 
 ## `@deepseek-ai/dsh-time-context`
@@ -3435,6 +3492,7 @@ export interface Config {
 - `@deepseek-ai/dsh-client-ui-renderer`（[`packages/client/ui-renderer/src/index.ts`](../packages/client/ui-renderer/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-session`（[`packages/client/ui-session/src/index.ts`](../packages/client/ui-session/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings`（[`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-settings-connections`（[`packages/client/ui-settings-connections/src/index.ts`](../packages/client/ui-settings-connections/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-general`（[`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-models`（[`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-plugin-inventory`（[`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts)）

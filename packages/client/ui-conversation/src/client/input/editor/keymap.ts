@@ -101,9 +101,9 @@ export function selectComposerNextOccurrence(editor: LexicalEditor): boolean {
     let searchFrom: number
     if (needle === '') {
       // Collapsed caret: take the word (letter/digit/CJK run) around it.
-      const word = [...haystack.matchAll(/[\w\u4e00-\u9fff]+/g)].find(match => match.index !== undefined
-        && match.index <= anchor && anchor <= match.index + match[0].length)
-      if (word === undefined || word.index === undefined || word[0] === '') return
+      const word = [...haystack.matchAll(/[\w\u4e00-\u9fff]+/g)].find(match =>
+        match.index <= anchor && anchor <= match.index + match[0].length)
+      if (word === undefined || word[0] === '') return
       needle = word[0]
       searchFrom = word.index + word[0].length
     } else {

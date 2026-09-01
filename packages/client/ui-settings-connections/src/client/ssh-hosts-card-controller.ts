@@ -21,9 +21,44 @@ export interface SshHostRow {
   identityFile: string
 }
 
+/** The document the `terminal-ssh` namespace stores. */
+export interface SshHostsDocument {
+  /** The user-managed roster; absent resolves to an empty roster. */
+  hosts?: SshHostRow[]
+}
+
+/**
+ * Narrow one served `terminal-ssh` section to the roster document, normalizing
+ * every row to the card's shape. Anything else decodes to nothing, so a
+ * malformed section never reaches the card.
+ * @param section - the wire section as stored.
+ * @returns the document, or undefined when it is not a roster document.
+ */
+export function decodeSshHostsDocument(section: unknown): SshHostsDocument | undefined {
+  if (typeof section !== 'object' || section === null || Array.isArray(section)) return undefined
+  const hosts = (section as { hosts?: unknown }).hosts
+  if (hosts === undefined) return {}
+  if (!Array.isArray(hosts)) return undefined
+  const rows: SshHostRow[] = []
+  for (const entry of hosts) {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return undefined
+    const row = entry as Record<string, unknown>
+    if (typeof row.name !== 'string' || typeof row.host !== 'string'
+      || typeof row.port !== 'number' || typeof row.username !== 'string') return undefined
+    rows.push({
+      name: row.name,
+      host: row.host,
+      port: row.port,
+      username: row.username,
+      identityFile: typeof row.identityFile === 'string' ? row.identityFile : '',
+    })
+  }
+  return { hosts: rows }
+}
+
 /** What the card renders. */
 export interface SshHostsCardState {
-  /** False while the namespace is not served to this client; the card renders nothing. */
+  /** False while the namespace is not served to this client; the section says so instead of the card. */
   available: boolean
   /** Whether the Host document accepts writes. */
   writable: boolean
@@ -47,7 +82,7 @@ export interface SshHostsCardActions {
   save: () => void
 }
 
-/** The face the slot registration injects into the card component. */
+/** The face the slot registration injects into the section. */
 export interface SshHostsCardInjected {
   hooks: { sshHosts: SnapshotStore<SshHostsCardState> }
   editRow: SshHostsCardActions['editRow']
@@ -58,10 +93,11 @@ export interface SshHostsCardInjected {
 
 /**
  * Create the SSH hosts card controller over one settings scope.
- * @param scope - the bound settings scope for the `terminal-ssh` namespace.
+ * @param scope - the bound settings scope for the `terminal-ssh` namespace,
+ *   decoded with {@link decodeSshHostsDocument}.
  * @returns the controller's state store, actions, and slot-injection face.
  */
-export function createSshHostsCardController(scope: SettingsScope<SshHostsCardState>): {
+export function createSshHostsCardController(scope: SettingsScope<SshHostsDocument>): {
   store: SnapshotStore<SshHostsCardState>
   actions: SshHostsCardActions
   inject(): SshHostsCardInjected
@@ -93,17 +129,18 @@ export function createSshHostsCardController(scope: SettingsScope<SshHostsCardSt
   const actions: SshHostsCardActions = {
     editRow: (index, patch) => {
       if (hosts[index] === undefined) return
-      hosts[index] = { ...hosts[index], ...patch }
-      publish({ hosts: hosts.map(row => ({ ...row })) })
+      // Replace, never mutate: published state is frozen outside production.
+      hosts = hosts.map((row, i) => (i === index ? { ...row, ...patch } : row))
+      publish({ hosts })
     },
     addRow: () => {
-      hosts.push({ name: '', host: '', port: 22, username: 'root', identityFile: '' })
-      publish({ hosts: hosts.map(row => ({ ...row })) })
+      hosts = [...hosts, { name: '', host: '', port: 22, username: 'root', identityFile: '' }]
+      publish({ hosts })
     },
     removeRow: (index) => {
       if (hosts[index] === undefined) return
-      hosts.splice(index, 1)
-      publish({ hosts: hosts.map(row => ({ ...row })) })
+      hosts = hosts.filter((_, i) => i !== index)
+      publish({ hosts })
     },
     save: () => {
       if (saving) return

@@ -92,7 +92,7 @@ export function resolveHosts(config: Config): SshHostConfig[] {
     seen.add(host.name)
     if (host.host.length === 0) throw new Error(`${label}: host must be non-empty`)
     if (host.username.length === 0) throw new Error(`${label}: username must be non-empty`)
-    const port = host.port ?? 22
+    const port = host.port
     if (!Number.isSafeInteger(port) || port <= 0 || port > 65_535) {
       throw new Error(`${label}: port must be a positive port number`)
     }
