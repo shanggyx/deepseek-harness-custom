@@ -25,20 +25,11 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount this backend when a composition should let the agent reach remote hosts through persistent terminal sessions. The terminal Consumer opens `ssh:<name>` exactly like a local `shell` session; every send, readiness, and close behavior is the shared PTY contract.
-
-### Composition
-
-```yaml
-- name: '@deepseek-ai/dsh-terminal'
-- name: '@deepseek-ai/dsh-subprocess-local'
-- name: '@deepseek-ai/dsh-terminal-ssh'
-- name: '@deepseek-ai/dsh-tool-terminal'
-```
+The base bundle mounts this backend for every profile, so `dsh web`, the desktop shell, and the CLI profiles all serve SSH sessions without extra composition; agent presets mount only the terminal tools. The terminal Consumer opens `ssh:<name>` exactly like a local `shell` session; every send, readiness, and close behavior is the shared PTY contract.
 
 ### Hosts
 
-A host carries `name`, `host`, `port` (default 22), `username`, and an optional `identityFile`. Two layers merge by name, the settings section winning: the plugin `config.hosts` (what a preset or deployment ships) and the user's `terminal-ssh` settings document (what the Connections settings page edits). Renaming a host replaces its backend under the new type; removing one unregisters it. A duplicate name across layers is one backend — the user layer's value.
+A host carries `name`, `host`, `port` (default 22), `username`, an optional `identityFile`, and an optional `enabled` switch (absent means enabled). Two layers merge by name, the settings section winning: the plugin `config.hosts` (what a deployment ships) and the user's `terminal-ssh` settings document (what the Connections settings page edits). A disabled host stays configured but registers no backend, so `ssh:<name>` is not openable until it is switched back on. Renaming a host replaces its backend under the new type; removing one unregisters it. A duplicate name across layers is one backend — the user layer's value.
 
 ### Configuration
 

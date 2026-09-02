@@ -21,6 +21,7 @@ export const SshHostsSettingsSchema: z<SshHostsDocument> = z.object({
       port: z.number().default(22),
       username: z.string(),
       identityFile: z.string().required(false),
+      enabled: z.boolean().required(false),
     }),
   ).default([]),
 })

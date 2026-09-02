@@ -95,6 +95,11 @@ function mergeHosts(composition: readonly SshHostConfig[], managed: readonly Ssh
   return [...byName.values()]
 }
 
+/** Hosts that get a registered backend: the roster minus toggled-off entries. */
+function activeHosts(hosts: readonly SshHostConfig[]): SshHostConfig[] {
+  return hosts.filter(host => host.enabled !== false)
+}
+
 /**
  * Register one SSH backend per host (composition hosts merged with the
  * user-managed settings hosts), replacing the previous registration set.
@@ -110,7 +115,7 @@ function registerBackends(
   disposers: (() => void)[],
 ): void {
   for (const dispose of disposers.splice(0)) dispose()
-  for (const host of hosts) {
+  for (const host of activeHosts(hosts)) {
     disposers.push(
       ctx.terminals.registerBackend(
         new SshTerminalBackend(host, sessionConfig, async spec => ctx.subprocess.spawnTerminal(spec)),
@@ -145,7 +150,7 @@ export function apply(ctx: Context, config: Config): void {
     }
     const rebind = (): void => {
       const previous = disposers.splice(0)
-      const hosts = mergeHosts(compositionHosts, readManaged())
+      const hosts = activeHosts(mergeHosts(compositionHosts, readManaged()))
       for (const host of hosts) {
         disposers.push(
           ctx.terminals.registerBackend(

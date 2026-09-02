@@ -2668,10 +2668,12 @@ export interface SshHostConfig {
   username: string
   /** Optional explicit identity file; ssh's default identities are always tried first. */
   identityFile?: string
+  /** Whether the backend is registered; absent means enabled. */
+  enabled?: boolean
 }
 ```
 
-Source: [`packages/terminal/terminal-ssh/src/config.ts:20`](../packages/terminal/terminal-ssh/src/config.ts)
+Source: [`packages/terminal/terminal-ssh/src/config.ts:22`](../packages/terminal/terminal-ssh/src/config.ts)
 
 <a id="deepseek-aidsh-time-context"></a>
 

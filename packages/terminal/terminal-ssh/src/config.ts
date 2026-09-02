@@ -14,6 +14,8 @@ export interface SshHostConfig {
   username: string
   /** Optional explicit identity file; ssh's default identities are always tried first. */
   identityFile?: string
+  /** Whether the backend is registered; absent means enabled. */
+  enabled?: boolean
 }
 
 /** Public plugin configuration. */
@@ -61,6 +63,7 @@ export const Config: z<Config> = z.object({
       port: z.number().default(22),
       username: z.string(),
       identityFile: z.string().required(false),
+      enabled: z.boolean().required(false),
     }),
   ).default([]),
   rows: z.number().default(40),
@@ -102,6 +105,7 @@ export function resolveHosts(config: Config): SshHostConfig[] {
       port,
       username: host.username,
       ...(host.identityFile !== undefined && { identityFile: host.identityFile }),
+      ...(host.enabled !== undefined && { enabled: host.enabled }),
     }
   })
 }

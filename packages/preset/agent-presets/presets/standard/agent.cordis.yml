@@ -49,23 +49,12 @@
   name: '@deepseek-ai/dsh-tool-pwsh'
   disabled: !!js process.platform !== 'win32'
 
-# ── 持久终端与 SSH 远程主机 ─────────────────────────────────────────────────
+# ── persistent terminal tools ───────────────────────────────────────────────
 #
-# terminals 服务 + SSH 后端 + 六件套终端工具：agent 用 terminal_open
-# (type: "ssh:<name>") 开持久远程会话，密码提示在会话里交互输入。
-# hosts 在 terminal-ssh 行的 config 里配置。
-- id: terminals
-  name: '@deepseek-ai/dsh-terminal'
-
-- id: terminal-ssh
-  name: '@deepseek-ai/dsh-terminal-ssh'
-  config:
-    hosts:
-      - name: seetacloud
-        host: connect.nma1.seetacloud.com
-        port: 26704
-        username: root
-
+# The `terminals` service and the SSH backends are HOST-plane rows in the
+# base bundle; the user-managed host roster lives in the `terminal-ssh`
+# settings namespace that the Connections settings page edits. This preset
+# only decides whether its agent gets the terminal tools at all.
 - id: tool-terminal
   name: '@deepseek-ai/dsh-tool-terminal'
 

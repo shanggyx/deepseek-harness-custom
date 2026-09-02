@@ -98,7 +98,10 @@ describe('ui-settings-connections apply', () => {
     expect(typeof face.save).toBe('function')
     // The store adopts the served roster: the section opens on real rows.
     expect(face.hooks.sshHosts.getSnapshot().hosts).toEqual([
-      { name: 'seetacloud', host: 'ssh.example', port: 22, username: 'root', identityFile: '' },
+      {
+        name: 'seetacloud', host: 'ssh.example', port: 22, username: 'root',
+        identityFile: '', enabled: true,
+      },
     ])
     expect(face.hooks.sshHosts.getSnapshot().available).toBe(true)
   })

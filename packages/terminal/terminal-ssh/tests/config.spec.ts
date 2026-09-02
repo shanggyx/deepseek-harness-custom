@@ -8,6 +8,7 @@ describe('terminal-ssh config', () => {
       hosts: [
         { name: 'gpu', host: 'connect.nma1.seetacloud.com', port: 26704, username: 'root' },
         { name: 'home', host: '192.168.1.20', port: 22, username: 'user', identityFile: '~/.ssh/id_rsa' },
+        { name: 'lab', host: '10.0.0.9', port: 22, username: 'root', enabled: false },
       ],
     })
     expect(hosts[0]).toEqual({
@@ -15,6 +16,10 @@ describe('terminal-ssh config', () => {
     })
     expect(hosts[1]).toEqual({
       name: 'home', host: '192.168.1.20', port: 22, username: 'user', identityFile: '~/.ssh/id_rsa',
+    })
+    // An explicit switch passes through; resolveHosts never decides reachability.
+    expect(hosts[2]).toEqual({
+      name: 'lab', host: '10.0.0.9', port: 22, username: 'root', enabled: false,
     })
   })
 

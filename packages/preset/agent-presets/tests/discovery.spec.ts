@@ -322,12 +322,19 @@ describe('rows naming a plugin that cannot be resolved', () => {
     expect(preset?.broken).toBeUndefined()
   })
 
-  it('reports a package whose install link dangles', async () => {
+  it('reports a package whose install link dangles', async (ctx) => {
     // What a stale profile install leaves behind: the name is still in
     // `node_modules`, pointing at a checkout that is gone.
     const home = await mkdtemp(join(tmpdir(), 'dsh-presets-dangling-'))
     await mkdir(join(home, 'node_modules', '@scope'), { recursive: true })
-    await symlink(join(home, 'deleted-checkout'), join(home, 'node_modules', '@scope', 'pkg'))
+    try {
+      await symlink(join(home, 'deleted-checkout'), join(home, 'node_modules', '@scope', 'pkg'))
+    } catch (error) {
+      // Windows without symlink privilege refuses the fixture itself; the
+      // dangling-link detection needs the link to exist to be exercised.
+      if ((error as NodeJS.ErrnoException).code === 'EPERM') return ctx.skip()
+      throw error
+    }
     await mkdir(join(home, 'presets', 'probe'), { recursive: true })
     await writeFile(join(home, 'presets', 'probe', COMPOSITION_FILE), "- id: p\n  name: '@scope/pkg'\n")
 

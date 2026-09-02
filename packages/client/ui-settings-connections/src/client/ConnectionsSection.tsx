@@ -23,6 +23,7 @@ export function ConnectionsSection(props: ConnectionsSectionProps) {
   const state = props.useSshHosts(snapshot => snapshot)
   const actions = {
     editRow: props.editRow,
+    toggleRow: props.toggleRow,
     addRow: props.addRow,
     removeRow: props.removeRow,
     save: props.save,

@@ -205,6 +205,15 @@
     - id: subprocess
       name: '@deepseek-ai/dsh-subprocess-local'
 
+    # Persistent terminal service and the SSH backends are host-plane: they
+    # register once per process, and the user-managed host roster lives in the
+    # `terminal-ssh` settings namespace that the Connections settings page edits.
+    - id: terminals
+      name: '@deepseek-ai/dsh-terminal'
+
+    - id: terminal-ssh
+      name: '@deepseek-ai/dsh-terminal-ssh'
+
     # Every shipped CLI mode starts with the same file-effect boundary.
     # The environment remains an explicit deployment override; otherwise fresh
     # sessions pin workspace-write + ask through the permission service below.

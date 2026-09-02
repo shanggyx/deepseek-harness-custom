@@ -25,9 +25,9 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Open the Connections section in the Settings navigation (the globe entry) to manage the hosts the agent reaches through persistent terminal sessions. Each row carries the five fields the SSH executor consumes; **Add host** appends a blank row and **Save** replaces the roster as one document mutation. Controls disable while the deployment stores settings read-only, and a rejected save keeps the draft on screen with a failure notice.
+Open the Connections section in the Settings navigation (the globe entry) to manage the hosts the agent reaches through persistent terminal sessions. Each host renders as one card — an enable switch, the host's name over its `user@host:port` line, an enabled/disabled marker, and an edit control that expands the five fields. The switch applies immediately; field edits stage until **Save** replaces the roster as one document mutation. Controls disable while the deployment stores settings read-only, and a rejected save keeps the draft on screen with a failure notice.
 
-The roster this page edits is the user layer only. Hosts composed by a preset or deployment bundle live in a different settings layer and are not shown or overwritten here.
+A toggled-off host stays configured but registers no backend, so `ssh:<name>` is not openable until it is switched back on. The roster this page edits is the user layer only: hosts composed by a preset or deployment bundle live in a different settings layer and are not shown or overwritten here.
 
 -----
 

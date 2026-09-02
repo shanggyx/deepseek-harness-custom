@@ -25,20 +25,11 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-当组合需要 agent 通过持久终端会话访问远程主机时挂载本后端。终端 Consumer 打开 `ssh:<name>` 与打开本地 `shell` 会话完全一致；发送、就绪与关闭行为都遵循共享的 PTY 契约。
-
-### 组合
-
-```yaml
-- name: '@deepseek-ai/dsh-terminal'
-- name: '@deepseek-ai/dsh-subprocess-local'
-- name: '@deepseek-ai/dsh-terminal-ssh'
-- name: '@deepseek-ai/dsh-tool-terminal'
-```
+base bundle 为所有 profile 挂载本后端：`dsh web`、桌面外壳与 CLI 各 profile 无需额外组合即可提供 SSH 会话；agent 预设只挂载终端工具。终端 Consumer 打开 `ssh:<name>` 与打开本地 `shell` 会话完全一致；发送、就绪与关闭行为都遵循共享的 PTY 契约。
 
 ### 主机
 
-一台主机包含 `name`、`host`、`port`（默认 22）、`username` 与可选 `identityFile`。两个层按名称合并，设置层胜出：插件 `config.hosts`（预设或部署提供的默认值）与用户的 `terminal-ssh` 设置文档（「连接」设置页编辑的内容）。重命名主机会以新类型替换其后端；删除主机则注销它。两层中的同名主机只是一个后端——取用户层的值。
+一台主机包含 `name`、`host`、`port`（默认 22）、`username`、可选 `identityFile` 与可选 `enabled` 开关（缺省为启用）。两个层按名称合并，设置层胜出：插件 `config.hosts`（部署提供的默认值）与用户的 `terminal-ssh` 设置文档（「连接」设置页编辑的内容）。停用的主机仍保留配置，但不再注册后端——重新打开开关前 `ssh:<name>` 无法打开。重命名主机会以新类型替换其后端；删除主机则注销它。两层中的同名主机只是一个后端——取用户层的值。
 
 ### 配置
 

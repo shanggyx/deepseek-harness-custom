@@ -30,7 +30,9 @@ export const TOPBAR_SCRIPT = String.raw`(function () {
     '#dsh-topbar .dsh-win-btn:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.08)); }',
     '#dsh-topbar .dsh-win-close:hover { background: #e81123; color: #ffffff; }',
     '#dsh-topbar-dropdown { position: fixed; z-index: 2147483001; min-width: 220px; padding: 6px;',
-    '  background: var(--dsw-alias-bg-base, #ffffff); color: var(--dsw-alias-label-primary, inherit);',
+    // Opaque surface: bg-base goes translucent under the image background mode,
+    // and a menu must cover the page content behind it completely.
+    '  background: var(--dsw-alias-bg-layer-2, #ffffff); color: var(--dsw-alias-label-primary, inherit);',
     '  border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1)); border-radius: 10px;',
     '  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); font-size: 13px; }',
     '#dsh-topbar-dropdown .dsh-item { display: flex; align-items: center; justify-content: space-between; gap: 12px;',

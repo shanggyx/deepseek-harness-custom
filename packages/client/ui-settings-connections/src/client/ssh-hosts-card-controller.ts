@@ -19,6 +19,8 @@ export interface SshHostRow {
   port: number
   username: string
   identityFile: string
+  /** Whether the host's backend is registered; a toggled-off host stays configured but unreachable. */
+  enabled: boolean
 }
 
 /** The document the `terminal-ssh` namespace stores. */
@@ -51,6 +53,7 @@ export function decodeSshHostsDocument(section: unknown): SshHostsDocument | und
       port: row.port,
       username: row.username,
       identityFile: typeof row.identityFile === 'string' ? row.identityFile : '',
+      enabled: row.enabled !== false,
     })
   }
   return { hosts: rows }
@@ -74,6 +77,8 @@ export interface SshHostsCardState {
 export interface SshHostsCardActions {
   /** Patch one host row in the draft. */
   editRow: (index: number, patch: Partial<SshHostRow>) => void
+  /** Flip one host's enabled switch and write the roster immediately. */
+  toggleRow: (index: number) => void
   /** Append one empty row. */
   addRow: () => void
   /** Remove one row from the draft. */
@@ -86,6 +91,7 @@ export interface SshHostsCardActions {
 export interface SshHostsCardInjected {
   hooks: { sshHosts: SnapshotStore<SshHostsCardState> }
   editRow: SshHostsCardActions['editRow']
+  toggleRow: SshHostsCardActions['toggleRow']
   addRow: SshHostsCardActions['addRow']
   removeRow: SshHostsCardActions['removeRow']
   save: SshHostsCardActions['save']
@@ -133,8 +139,16 @@ export function createSshHostsCardController(scope: SettingsScope<SshHostsDocume
       hosts = hosts.map((row, i) => (i === index ? { ...row, ...patch } : row))
       publish({ hosts })
     },
+    toggleRow: (index) => {
+      if (hosts[index] === undefined || saving) return
+      // The switch is an immediate apply: flip and write in one gesture, so
+      // the registered backends track what the user sees without a save step.
+      hosts = hosts.map((row, i) => (i === index ? { ...row, enabled: !row.enabled } : row))
+      publish({ hosts })
+      actions.save()
+    },
     addRow: () => {
-      hosts = [...hosts, { name: '', host: '', port: 22, username: 'root', identityFile: '' }]
+      hosts = [...hosts, { name: '', host: '', port: 22, username: 'root', identityFile: '', enabled: true }]
       publish({ hosts })
     },
     removeRow: (index) => {
@@ -170,6 +184,7 @@ export function createSshHostsCardController(scope: SettingsScope<SshHostsDocume
       return {
         hooks: { sshHosts: store },
         editRow: actions.editRow,
+        toggleRow: actions.toggleRow,
         addRow: actions.addRow,
         removeRow: actions.removeRow,
         save: actions.save,

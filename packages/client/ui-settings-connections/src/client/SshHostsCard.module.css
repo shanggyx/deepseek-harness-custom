@@ -1,4 +1,5 @@
-/* SSH hosts card: roster rows of five inputs + row remove, add/save actions. */
+/* SSH hosts roster: header with the add action, one toggleable card per host,
+   and an expandable field grid per card. */
 
 .card {
   display: flex;
@@ -9,8 +10,15 @@
 
 .head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .title {
@@ -26,36 +34,135 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.input {
-  flex: 1;
-  min-width: 0;
-  height: 32px;
-  padding: 0 8px;
+.add {
+  flex: none;
+  height: 30px;
+  padding: 0 14px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
+  border-radius: 15px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font: inherit;
   font-size: 12px;
+  cursor: pointer;
 }
 
-.input:focus {
-  outline: none;
-  border-color: var(--dsw-alias-brand-primary);
+.add:hover:not(:disabled) {
+  background: var(--dsw-alias-bg-layer-2);
 }
 
-.input:disabled {
+.hostCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--dsw-alias-label-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.endpoint {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dsw-alias-border-l3);
+}
+
+.dotOn {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.switch {
+  box-sizing: border-box;
+  position: relative;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 20px;
+  padding: 2px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--dsw-alias-border-l3);
+  cursor: pointer;
+}
+
+.switchOn {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.switch:disabled {
+  cursor: default;
   opacity: 0.5;
 }
 
-.remove,
-.secondary {
+.switch:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.thumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-primary-foreground);
+  transition: transform 120ms ease;
+}
+
+.switchOn .thumb {
+  transform: translateX(16px);
+}
+
+.iconBtn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1);
@@ -65,23 +172,75 @@
   cursor: pointer;
 }
 
-.remove {
-  flex: none;
-  width: 28px;
-  height: 28px;
-}
-
-.remove:hover:not(:disabled) {
+.iconBtn:hover:not(:disabled) {
   background: var(--dsw-alias-bg-layer-2);
 }
 
+.iconBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.input {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--dsw-alias-state-business-primary);
+}
+
+.input:disabled {
+  opacity: 0.5;
+}
+
 .secondary {
+  align-self: flex-start;
   height: 30px;
   padding: 0 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .secondary:hover:not(:disabled) {
   background: var(--dsw-alias-bg-layer-2);
+}
+
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .actions {
