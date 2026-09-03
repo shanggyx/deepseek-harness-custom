@@ -1,12 +1,23 @@
-/** SSH 远程工作区锚点：每台启用主机在本地文件系统上的落点目录与会话提示子句。 */
+/**
+ * SSH 远程工作区锚点：每台启用主机在本地文件系统上的落点目录与会话提示子句。
+ *
+ * 锚点只是一个空目录——本地注册表、沙箱与持久化要求会话 cwd 是真实目录——
+ * 项目的实际工作全部发生在远程主机上（远程登录家目录）。默认锚点根放在
+ * 系统临时目录下，不占用用户目录；可用插件配置 `remoteWorkspaceRoot` 改到任意位置。
+ */
 
 import { mkdir } from 'node:fs/promises'
-import { sep } from 'node:path'
-import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
+import { tmpdir } from 'node:os'
+import { join, sep } from 'node:path'
 import type { SshHostConfig } from './config.ts'
 
-/** The harness-home subdirectory holding every host's anchor directory. */
-export const REMOTE_WORKSPACES_DIR = 'remote-workspaces'
+/** The temp-directory subdirectory holding every host's anchor directory. */
+export const REMOTE_WORKSPACES_DIR = 'dsh-remote-workspaces'
+
+/** The default anchor root: this user's OS temp directory, outside the profile. */
+export function defaultAnchorRoot(): string {
+  return join(tmpdir(), REMOTE_WORKSPACES_DIR)
+}
 
 /**
  * Whether a host name can embed as one anchor path segment.
@@ -19,27 +30,29 @@ export function isAnchorSegment(name: string): boolean {
 }
 
 /**
- * The absolute local anchor directory of one host's remote workspace — a real
- * directory so the workspace registry, sandbox, and persistence keep treating
- * the session as local, while the prompt clause directs work to the host.
+ * The local anchor directory of one host's remote workspace — a real directory
+ * so the workspace registry, sandbox, and persistence keep treating the
+ * session as local, while the prompt clause directs work to the host.
  * @param name - the host's roster name.
+ * @param root - the anchor root; omitted resolves to the OS temp directory.
  * @returns the anchor directory path.
  * @throws when the name cannot embed as one path segment.
  */
-export function anchorPathOf(name: string): string {
+export function anchorPathOf(name: string, root: string = defaultAnchorRoot()): string {
   if (!isAnchorSegment(name)) {
     throw new Error(`terminal-ssh: host ${JSON.stringify(name)} cannot anchor a remote workspace`)
   }
-  return dshHomePath(REMOTE_WORKSPACES_DIR, name)
+  return join(root, name)
 }
 
 /**
  * Create one host's anchor directory if absent.
  * @param name - the host's roster name.
+ * @param root - the anchor root; omitted resolves to the OS temp directory.
  * @returns the anchor directory path.
  */
-export async function ensureAnchor(name: string): Promise<string> {
-  const anchor = anchorPathOf(name)
+export async function ensureAnchor(name: string, root?: string): Promise<string> {
+  const anchor = anchorPathOf(name, root)
   await mkdir(anchor, { recursive: true })
   return anchor
 }
@@ -49,14 +62,19 @@ export async function ensureAnchor(name: string): Promise<string> {
  * Comparison is case-insensitive where the platform's paths are.
  * @param cwd - the session's canonical working directory.
  * @param hosts - the merged host roster.
+ * @param root - the anchor root; omitted resolves to the OS temp directory.
  * @returns the host owning that anchor, or undefined.
  */
-export function hostForAnchor(cwd: string, hosts: readonly SshHostConfig[]): SshHostConfig | undefined {
+export function hostForAnchor(
+  cwd: string,
+  hosts: readonly SshHostConfig[],
+  root: string = defaultAnchorRoot(),
+): SshHostConfig | undefined {
   const fold = (value: string): string => (process.platform === 'win32' ? value.toLowerCase() : value)
   const folded = fold(cwd)
   return hosts.find((host) => {
     if (host.enabled === false || !isAnchorSegment(host.name)) return false
-    const anchor = fold(anchorPathOf(host.name))
+    const anchor = fold(anchorPathOf(host.name, root))
     return folded === anchor || folded.startsWith(anchor + sep)
   })
 }

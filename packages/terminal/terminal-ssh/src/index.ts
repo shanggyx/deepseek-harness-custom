@@ -22,14 +22,14 @@ import { resolveHosts, type Config, type SshHostConfig } from './config.ts'
 import {
   SshHostsSettingsSchema, sshSettingsNamespace, type SshHostsDocument,
 } from './settings.ts'
-import { ensureAnchor, hostForAnchor, renderSshWorkspaceContext } from './workspace.ts'
+import { defaultAnchorRoot, ensureAnchor, hostForAnchor, renderSshWorkspaceContext } from './workspace.ts'
 
 export { Config, resolveHosts } from './config.ts'
 export type { SshHostConfig } from './config.ts'
 export { SSH_SETTINGS_NAMESPACE, sshSettingsNamespace, SshHostsSettingsSchema } from './settings.ts'
 export type { SshHostsDocument } from './settings.ts'
 export {
-  REMOTE_WORKSPACES_DIR, anchorPathOf, ensureAnchor, hostForAnchor,
+  REMOTE_WORKSPACES_DIR, anchorPathOf, defaultAnchorRoot, ensureAnchor, hostForAnchor,
   isAnchorSegment, renderSshWorkspaceContext,
 } from './workspace.ts'
 
@@ -143,10 +143,11 @@ function registerBackends(
  * unknown or disabled names fail loud at the call, not at activation.
  */
 export class SshWorkspaceAnchors extends Service {
-  /** @param ctx - Host context. @param roster - the live merged host roster. */
+  /** @param ctx - Host context. @param roster - the live merged host roster. @param root - the anchor root directory. */
   constructor(
     ctx: Context,
     private readonly roster: () => readonly SshHostConfig[],
+    private readonly root: string,
   ) {
     super(ctx, 'sshWorkspace')
   }
@@ -163,7 +164,7 @@ export class SshWorkspaceAnchors extends Service {
     if (host === undefined || host.enabled === false) {
       throw new Error(`terminal-ssh: no enabled ssh host ${JSON.stringify(name)}`)
     }
-    return ensureAnchor(name)
+    return ensureAnchor(name, this.root)
   }
 }
 
@@ -183,13 +184,18 @@ export function apply(ctx: Context, config: Config): void {
     cwd: process.cwd(),
   }
   const compositionHosts = resolveHosts(config)
+  // Explicit resolve step: an absent or empty config value picks the OS temp
+  // directory, so anchors never land in the user's profile by default.
+  const anchorRoot = config.remoteWorkspaceRoot !== undefined && config.remoteWorkspaceRoot.length > 0
+    ? config.remoteWorkspaceRoot
+    : defaultAnchorRoot()
   let roster: readonly SshHostConfig[] = compositionHosts
   const disposers: (() => void)[] = []
   registerBackends(ctx, sessionConfig, compositionHosts, disposers)
 
   // The workspace controller resolves `create { sshHost }` against the live
   // roster through this service; the clause below reads the same roster.
-  new SshWorkspaceAnchors(ctx, () => roster)
+  new SshWorkspaceAnchors(ctx, () => roster, anchorRoot)
 
   // Model-visible ⟺ logged: the clause rides the runtime-context snapshot
   // (a `user/message` event) on the session's first assembled request.
@@ -200,7 +206,7 @@ export function apply(ctx: Context, config: Config): void {
       text: (context) => {
         const cwd = context.agent?.session.header.cwd
         if (cwd === undefined) return ''
-        const host = hostForAnchor(cwd, roster)
+        const host = hostForAnchor(cwd, roster, anchorRoot)
         return host === undefined ? '' : renderSshWorkspaceContext(host)
       },
     })
@@ -226,6 +232,12 @@ export function apply(ctx: Context, config: Config): void {
         )
       }
       for (const dispose of previous) dispose()
+      // OS temp cleanup can wipe anchors between runs; rebuild them so
+      // existing remote workspaces keep attaching sessions. A failure here
+      // resurfaces loudly when a workspace is actually created.
+      for (const host of activeHosts(merged)) {
+        void ensureAnchor(host.name, anchorRoot).catch(() => undefined)
+      }
     }
     settingsCtx.on('settings/document-updated', rebind)
     rebind()

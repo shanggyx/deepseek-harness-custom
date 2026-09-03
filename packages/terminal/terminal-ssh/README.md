@@ -33,7 +33,7 @@ A host carries `name`, `host`, `port` (default 22), `username`, an optional `ide
 
 ### Remote workspaces
 
-Every enabled host also anchors a remote workspace: a real local directory under `~/.dsh/remote-workspaces/<name>` that the workspace registry, sandbox, and persistence treat as an ordinary workspace. Creating a Workspace with `workspace.create { sshHost: <name> }` (the Connections roster feeds the picker) provisions the anchor and registers the workspace; sessions created in it receive a `ssh:workspace` runtime-context clause — logged with the runtime-context snapshot like any prompt clause — directing the agent to work on the remote host through the `ssh:<name>` terminal instead of the local file tools.
+Every enabled host also anchors a remote workspace: a real local directory that the workspace registry, sandbox, and persistence treat as an ordinary workspace. The anchor root defaults to this user's OS temp directory (`dsh-remote-workspaces/<name>`), deliberately outside the profile home, and moves to any location via the plugin's `remoteWorkspaceRoot` config. Creating a Workspace with `workspace.create { sshHost: <name> }` (the Connections roster feeds the picker) provisions the anchor and registers the workspace; sessions created in it receive a `ssh:workspace` runtime-context clause — logged with the runtime-context snapshot like any prompt clause — directing the agent to work on the remote host (its login home directory) through the `ssh:<name>` terminal instead of the local file tools. The anchor itself stays empty: no project data is stored locally.
 
 ### Configuration
 

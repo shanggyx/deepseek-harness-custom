@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-29-ssh-hosts-as-remote-workspaces.md
-2026-08-29-ssh-hosts-as-remote-workspaces.md: de6650c21fe99c361c6afb379cb7a480f2709310
-2026-08-29-ssh-hosts-as-remote-workspaces.zh.md: 03bf8c118d7fe535a6756e0e5a48ccc1849d2bb5
+2026-08-29-ssh-hosts-as-remote-workspaces.md: 8947d41a3b49cb3226e7cadc529c50d754fe8df7
+2026-08-29-ssh-hosts-as-remote-workspaces.zh.md: 17377e1184eddf80a5166e8d4850b44270e4cdc2

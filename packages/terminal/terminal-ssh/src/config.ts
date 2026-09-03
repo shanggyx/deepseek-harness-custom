@@ -49,6 +49,11 @@ export interface Config {
   disposeGraceMs?: number
   /** Local process working directory for the ssh client (carries no remote meaning). */
   cwd?: string
+  /**
+   * Root directory holding every host's local remote-workspace anchor; the
+   * default is this user's OS temp directory, never the profile home.
+   */
+  remoteWorkspaceRoot?: string
 }
 
 /** Configuration after Schemastery defaults. */
@@ -66,6 +71,7 @@ export const Config: z<Config> = z.object({
       enabled: z.boolean().required(false),
     }),
   ).default([]),
+  remoteWorkspaceRoot: z.string().required(false),
   rows: z.number().default(40),
   cols: z.number().default(160),
   scrollbackLines: z.number().default(10_000),
