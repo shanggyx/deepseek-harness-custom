@@ -20,7 +20,7 @@ import path from 'node:path'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { detectImageMime } from './image-mime.ts'
 import { PET_HEIGHT, PET_WIDTH, petStateScript, type PetBalanceState } from './pet.ts'
-import { DEFAULT_HEIGHT, DEFAULT_WIDTH, MIN_HEIGHT, MIN_WIDTH, sanitizeBounds, type WindowBounds } from './bounds.ts'
+import { DEFAULT_HEIGHT, DEFAULT_WIDTH, MIN_HEIGHT, MIN_WIDTH } from './bounds.ts'
 import { parseReadyUrl } from './readiness.ts'
 import { TOPBAR_SCRIPT } from './topbar.ts'
 
@@ -28,9 +28,6 @@ import { TOPBAR_SCRIPT } from './topbar.ts'
 const NODE_EXECUTABLE_ENV = 'DSH_DESKTOP_NODE'
 /** Environment override naming the dsh launcher module; defaults to the repository source entry behind the `pnpm dsh` script. */
 const LAUNCHER_ENTRY_ENV = 'DSH_DESKTOP_ENTRY'
-
-/** Saved-geometry file name under Electron's userData directory. */
-const BOUNDS_FILE = 'window-bounds.json'
 
 /**
  * The window background pairs with the web UI's light `bg-base` token. It is
@@ -148,24 +145,6 @@ function awaitReadyUrl(started: ChildProcess): Promise<URL> {
   })
 }
 
-/** The saved-geometry document; a missing or corrupt file means "no remembered geometry". */
-function loadBounds(): unknown {
-  // ENOENT is a first run and a parse error is a corrupt file; both fall back
-  // to the defaults, and nothing else can reach the failure.
-  try {
-    return JSON.parse(readFileSync(path.join(app.getPath('userData'), BOUNDS_FILE), 'utf8')) as unknown
-  } catch {
-    return undefined
-  }
-}
-
-/** Persist the window geometry for the next run. */
-function saveBounds(bounds: WindowBounds): void {
-  const dir = app.getPath('userData')
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(path.join(dir, BOUNDS_FILE), JSON.stringify(bounds))
-}
-
 /**
  * The window and taskbar icon, shipped beside the shell. Only Windows reads
  * the .ico form; other platforms fall back to the runtime default.
@@ -177,13 +156,13 @@ function windowIcon(): string | undefined {
 
 /** Create the chrome-less window: the injected in-page strip is the title bar. */
 function createWindow(): BrowserWindow {
-  const saved = sanitizeBounds(loadBounds(), screen.getPrimaryDisplay().workArea)
+  // Every launch opens at the default size, centered, never maximized — the
+  // same moderate window Codex-class desktop apps open with; a maximize is a
+  // user gesture for that run, not a remembered startup state.
   const icon = windowIcon()
   const window = new BrowserWindow({
-    width: saved?.width ?? DEFAULT_WIDTH,
-    height: saved?.height ?? DEFAULT_HEIGHT,
-    ...(saved?.x !== undefined && { x: saved.x }),
-    ...(saved?.y !== undefined && { y: saved.y }),
+    width: DEFAULT_WIDTH,
+    height: DEFAULT_HEIGHT,
     ...(icon !== undefined && { icon }),
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
@@ -198,7 +177,6 @@ function createWindow(): BrowserWindow {
   // Hidden until first paint: no blank or unthemed frame ever shows.
   window.once('ready-to-show', () => { window.show() })
   window.on('close', (event) => {
-    saveBounds(window.getBounds())
     // 常驻模式：关主窗口 = 收起界面，后台服务与桌宠继续跑；双击图标秒回。
     if (keepAliveEnabled() && !quitting) {
       event.preventDefault()
