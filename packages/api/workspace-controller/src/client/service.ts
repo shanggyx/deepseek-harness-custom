@@ -34,11 +34,12 @@ export interface IWorkspaces {
   /** Host-authoritative Workspace rows, order, archive set, and follow lifecycle. */
   readonly list: WorkspaceSource
   /**
-   * Register an existing path as a Workspace.
+   * Register an existing path as a Workspace, or create one over an SSH
+   * host's local anchor directory.
    * @param input - Host create payload.
    * @returns the created or idempotently resolved Workspace.
    */
-  create(input: { path: string }): Promise<WorkspaceView>
+  create(input: { path?: string; sshHost?: string }): Promise<WorkspaceView>
   /**
    * Rename a Workspace.
    * @param workspaceId - target Workspace.
@@ -89,7 +90,7 @@ export class WorkspaceController extends Service implements IWorkspaces {
     this.list = model
   }
 
-  async create(input: { path: string }): Promise<WorkspaceView> {
+  async create(input: { path?: string; sshHost?: string }): Promise<WorkspaceView> {
     const result = await this.model.create(input)
     if (!result.ok) throw new WorkspaceCreateError(result.error)
     return result.value.workspace

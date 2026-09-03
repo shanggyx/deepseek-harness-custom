@@ -17,21 +17,34 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { TerminalBackend, TerminalBackendSession, TerminalBackendSpawnSpec } from '@deepseek-ai/dsh-terminal'
 import { LocalPtySession, resolveConfig, type ResolvedConfig } from '@deepseek-ai/dsh-terminal-bash'
 import type { SubprocessTerminalHandle, SubprocessTerminalSpawnSpec } from '@deepseek-ai/dsh-subprocess'
+import { Service } from '@deepseek-ai/cordis'
 import { resolveHosts, type Config, type SshHostConfig } from './config.ts'
 import {
   SshHostsSettingsSchema, sshSettingsNamespace, type SshHostsDocument,
 } from './settings.ts'
+import { ensureAnchor, hostForAnchor, renderSshWorkspaceContext } from './workspace.ts'
 
 export { Config, resolveHosts } from './config.ts'
 export type { SshHostConfig } from './config.ts'
 export { SSH_SETTINGS_NAMESPACE, sshSettingsNamespace, SshHostsSettingsSchema } from './settings.ts'
 export type { SshHostsDocument } from './settings.ts'
+export {
+  REMOTE_WORKSPACES_DIR, anchorPathOf, ensureAnchor, hostForAnchor,
+  isAnchorSegment, renderSshWorkspaceContext,
+} from './workspace.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'terminal-ssh'
 
 /** Services required before the backends can spawn sessions. */
 export const inject = ['terminals', 'subprocess']
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Anchor-directory resolution for SSH hosts' remote workspaces. */
+    sshWorkspace: SshWorkspaceAnchors
+  }
+}
 
 /**
  * Compose the ssh client argv for one host: port, optional explicit identity
@@ -125,9 +138,42 @@ function registerBackends(
 }
 
 /**
+ * Resolves the local anchor directory of one host's remote workspace over the
+ * live merged roster. Consumed by the workspace controller's `create` verb;
+ * unknown or disabled names fail loud at the call, not at activation.
+ */
+export class SshWorkspaceAnchors extends Service {
+  /** @param ctx - Host context. @param roster - the live merged host roster. */
+  constructor(
+    ctx: Context,
+    private readonly roster: () => readonly SshHostConfig[],
+  ) {
+    super(ctx, 'sshWorkspace')
+  }
+
+  /**
+   * Ensure and return one host's anchor directory.
+   * @param name - the host's roster name.
+   * @returns the created (or existing) anchor directory path.
+   * @throws when no enabled host carries that name or the name cannot embed
+   *   as one anchor path segment.
+   */
+  async anchorOf(name: string): Promise<string> {
+    const host = this.roster().find(candidate => candidate.name === name)
+    if (host === undefined || host.enabled === false) {
+      throw new Error(`terminal-ssh: no enabled ssh host ${JSON.stringify(name)}`)
+    }
+    return ensureAnchor(name)
+  }
+}
+
+/**
  * Register the SSH backends and keep them in step with the user settings
  * document. Composition hosts ship defaults; the settings document carries
- * the user's own hosts and wins per name.
+ * the user's own hosts and wins per name. Also owns the remote-workspace
+ * seam: the anchor-directory service the workspace controller creates
+ * workspaces through, and the prompt clause that directs a session anchored
+ * on one host to work through its `ssh:<name>` terminal.
  * @param ctx - plugin context carrying the terminals registry and subprocess seam.
  * @param config - validated plugin configuration.
  */
@@ -137,8 +183,28 @@ export function apply(ctx: Context, config: Config): void {
     cwd: process.cwd(),
   }
   const compositionHosts = resolveHosts(config)
+  let roster: readonly SshHostConfig[] = compositionHosts
   const disposers: (() => void)[] = []
   registerBackends(ctx, sessionConfig, compositionHosts, disposers)
+
+  // The workspace controller resolves `create { sshHost }` against the live
+  // roster through this service; the clause below reads the same roster.
+  new SshWorkspaceAnchors(ctx, () => roster)
+
+  // Model-visible ⟺ logged: the clause rides the runtime-context snapshot
+  // (a `user/message` event) on the session's first assembled request.
+  ctx.inject(['systemPrompt'], (scope: Context) => {
+    scope.systemPrompt.context({
+      name: 'ssh:workspace',
+      order: 115,
+      text: (context) => {
+        const cwd = context.agent?.session.header.cwd
+        if (cwd === undefined) return ''
+        const host = hostForAnchor(cwd, roster)
+        return host === undefined ? '' : renderSshWorkspaceContext(host)
+      },
+    })
+  })
 
   // The user settings document carries the GUI-managed hosts; a refresh
   // (commit from the settings UI) re-registers the merged roster in place.
@@ -150,8 +216,9 @@ export function apply(ctx: Context, config: Config): void {
     }
     const rebind = (): void => {
       const previous = disposers.splice(0)
-      const hosts = activeHosts(mergeHosts(compositionHosts, readManaged()))
-      for (const host of hosts) {
+      const merged = mergeHosts(compositionHosts, readManaged())
+      roster = merged
+      for (const host of activeHosts(merged)) {
         disposers.push(
           ctx.terminals.registerBackend(
             new SshTerminalBackend(host, sessionConfig, async spec => ctx.subprocess.spawnTerminal(spec)),

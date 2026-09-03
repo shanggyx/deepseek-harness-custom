@@ -805,6 +805,7 @@ export function WorkspaceBrowser({
   useSessions,
   useSessionPendingInteraction,
   useWorkspaces,
+  useSshHosts,
   useStore,
   actions,
   startSession,
@@ -1167,6 +1168,7 @@ export function WorkspaceBrowser({
           open={wsPickerOpen}
           anchorRef={wsPlusRef}
           useWorkspaces={useWorkspaces}
+          useSshHosts={useSshHosts}
           createWorkspace={createWorkspace}
           useDirectoryFlow={useDirectoryFlow}
           renderDirectoryFlow={owner => renderSlot('sidebar.workspaces.directoryFlow', owner)}

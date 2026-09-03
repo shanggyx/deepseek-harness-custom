@@ -45,6 +45,11 @@ async function createRuntime(): Promise<SlotTestRuntime> {
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)
+  // ui-workspace binds the `terminal-ssh` scope for the picker's remote-host
+  // section; the rename flow never reads it, so an unserved scope suffices.
+  runtime.ctx.provide('settingsScope', {
+    bind: () => ({ getSnapshot: () => ({ status: 'unavailable' }), subscribe: () => () => {} }),
+  })
   return runtime
 }
 

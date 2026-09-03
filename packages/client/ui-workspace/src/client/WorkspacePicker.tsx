@@ -5,22 +5,26 @@
  * registration. Directory picking itself lives in the composed flow package's
  * slot occupant (see the contract module doc): this core only opens the flow,
  * adopts the picked path, and owns the error surface. Adding a workspace has
- * exactly one route — pick a host directory, new or existing — because the
- * occupant's own create-folder affordance already covers creating one.
+ * two routes — pick a host directory (new or existing), or pick an enabled
+ * SSH host from the served roster, which anchors the Workspace on that
+ * host's local anchor directory.
  */
 import type { ReactNode, RefObject } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Button, IconFolderClose16, IconPlusOutline16, Menu, Modal, type MenuEntry,
+  Button, IconFolderClose16, IconGlobeOutline14, IconPlusOutline16, Menu, Modal, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   WorkspaceId, WorkspaceSnapshot, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
-import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from './contract/slots.ts'
+import type {
+  DirectoryFlowOwnerProps, SshWorkspaceHost, WorkspacePickerProps,
+} from './contract/slots.ts'
 import css from './WorkspacePicker.module.css'
 
 const ADD_WORKSPACE = '::add-workspace'
+const SSH_PREFIX = '::ssh:'
 
 /** Core flow props: the owner supplies popover control and pick semantics. */
 export interface WorkspacePickFlowProps {
@@ -32,10 +36,12 @@ export interface WorkspacePickFlowProps {
   anchorRef?: RefObject<HTMLElement | null> | undefined
   /** Selector hook over the workspace list (framework standard hook). */
   useWorkspaces: <S>(selector: (state: WorkspaceSnapshot) => S) => S
-  /** Adopt a picked host directory as a real Workspace. */
-  createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
+  /** Adopt a picked host directory, or an SSH host's anchor, as a real Workspace. */
+  createWorkspace: (input: { path?: string; sshHost?: string }) => Promise<WorkspaceView>
   /** Bound occupancy selector hook for this surface's directory-flow hole (empty leaves the surface with no add action). */
   useDirectoryFlow: SnapshotSelectorHook<boolean>
+  /** Enabled SSH hosts offered as remote workspace targets. */
+  useSshHosts: SnapshotSelectorHook<readonly SshWorkspaceHost[]>
   /** Render this surface's directory-flow hole with the owner conversation (the entry's narrowed renderSlot). */
   renderDirectoryFlow: (owner: DirectoryFlowOwnerProps) => ReactNode
   /** A real Workspace was picked or created. */
@@ -62,6 +68,7 @@ export function WorkspacePickFlow({
   useWorkspaces,
   createWorkspace,
   useDirectoryFlow,
+  useSshHosts,
   renderDirectoryFlow,
   onPick,
   onClose,
@@ -71,6 +78,7 @@ export function WorkspacePickFlow({
 }: WorkspacePickFlowProps) {
   const workspaceSnapshot = useWorkspaces(state => state)
   const workspaces = workspaceSnapshot.items
+  const sshHosts = useSshHosts(hosts => hosts)
   const getAnchorRect = useCallback(
     () => anchorRef?.current?.getBoundingClientRect() ?? null,
     [anchorRef],
@@ -84,6 +92,10 @@ export function WorkspacePickFlow({
   // menu action stays disabled — a late outcome must not race a concurrent
   // selection or adoption.
   const flowBusy = flowOpen || pickingFolder
+  // An SSH adoption is the same busy surface: the create crosses the wire to
+  // the Host, which provisions the anchor directory before answering.
+  const [adoptingSsh, setAdoptingSsh] = useState(false)
+  const sshBusy = adoptingSsh
 
   // The occupied hole gates the picking affordance: with no composed flow the
   // entry simply is not there (the seam's documented no-flow default). The
@@ -101,16 +113,25 @@ export function WorkspacePickFlow({
   const addEntries: MenuEntry[] = flowAvailable
     ? [{ id: ADD_WORKSPACE, label: t('menu.addWorkspace'), icon: <IconPlusOutline16 size={16} />, disabled: flowBusy }]
     : []
-  // With workspaces listed, the add action pins below the scroll region
-  // (divider + always visible); otherwise it IS the menu.
-  const pinAdd = !addOnly && workspaces.length > 0
+  const sshEntries: MenuEntry[] = sshHosts.map(host => ({
+    id: `${SSH_PREFIX}${host.name}`,
+    label: host.name,
+    icon: <IconGlobeOutline14 size={16} />,
+    disabled: flowBusy || sshBusy,
+  }))
+  // With anything listed, the add action pins below the scroll region
+  // (divider + always visible); otherwise the lists ARE the menu.
+  const pinAdd = !addOnly && (workspaces.length > 0 || sshEntries.length > 0)
   const items: MenuEntry[] = pinAdd
-    ? workspaces.map(workspace => ({
-      id: workspace.workspaceId,
-      label: workspace.title,
-      icon: <IconFolderClose16 size={16} />,
-      disabled: flowBusy,
-    }))
+    ? [
+      ...workspaces.map(workspace => ({
+        id: workspace.workspaceId,
+        label: workspace.title,
+        icon: <IconFolderClose16 size={16} />,
+        disabled: flowBusy || sshBusy,
+      })),
+      ...sshEntries,
+    ]
     : addEntries
   // Nothing listed and nothing to add with (a composition that mounts this
   // package without any directory-picker): an empty popover would claim a
@@ -130,6 +151,15 @@ export function WorkspacePickFlow({
     }).catch((reason: unknown) => {
       setModalError(reason instanceof Error ? reason.message : String(reason))
       setFlowOpen(false)
+      setErrorOpen(true)
+    })
+
+  /** Adopt an SSH host's anchor directory as a Workspace (immediate, no folder flow). */
+  const adoptSshHost = (name: string): Promise<void> =>
+    createWorkspace({ sshHost: name }).then((workspace) => {
+      onPick(workspace.workspaceId)
+    }).catch((reason: unknown) => {
+      setModalError(reason instanceof Error ? reason.message : String(reason))
       setErrorOpen(true)
     })
 
@@ -175,6 +205,14 @@ export function WorkspacePickFlow({
   const handleSelect = (id: string): void => {
     if (id === ADD_WORKSPACE) {
       openDirectoryFlow()
+      return
+    }
+    if (id.startsWith(SSH_PREFIX)) {
+      // Close the popover and let the adoption own the surface until it
+      // settles; a failure reopens with the error dialog.
+      onClose()
+      setAdoptingSsh(true)
+      void adoptSshHost(id.slice(SSH_PREFIX.length)).finally(() => { setAdoptingSsh(false) })
       return
     }
     onPick(id as WorkspaceId)
@@ -226,6 +264,7 @@ export function WorkspacePicker({
   open,
   anchorRef,
   useWorkspaces,
+  useSshHosts,
   selectedId,
   onPick,
   onClose,
@@ -240,6 +279,7 @@ export function WorkspacePicker({
       open={open}
       anchorRef={anchorRef}
       useWorkspaces={useWorkspaces}
+      useSshHosts={useSshHosts}
       createWorkspace={createWorkspace}
       useDirectoryFlow={useDirectoryFlow}
       renderDirectoryFlow={owner => renderSlot('conversation.hero.workspace.directoryFlow', owner)}

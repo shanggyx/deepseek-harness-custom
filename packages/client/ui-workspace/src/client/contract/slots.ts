@@ -65,6 +65,14 @@ export type DirectoryFlowSlotName =
   | 'conversation.hero.workspace.directoryFlow'
   | 'sidebar.workspaces.directoryFlow'
 
+/** One remote host offered as a Workspace target in the pick menu. */
+export interface SshWorkspaceHost {
+  /** The roster name; the `create { sshHost }` payload. */
+  name: string
+  /** The `user@host:port` endpoint line shown under/with the name. */
+  endpoint: string
+}
+
 /**
  * Directory-picking share both trigger surfaces consume. Occupancy rides the
  * inject face's reserved `hooks` compartment: the renderer binds the source
@@ -79,6 +87,17 @@ export type DirectoryPickingInjected = {
   }
 }
 
+/**
+ * Remote-host share both trigger surfaces consume: the served `terminal-ssh`
+ * roster projected to enabled hosts, offered as Workspace targets.
+ */
+export type SshHostsInjected = {
+  hooks: {
+    /** Enabled SSH hosts, refreshed on roster commits. */
+    sshHosts: HostObservable<readonly SshWorkspaceHost[]>
+  }
+}
+
 /** Component-side view of the picking share: the bound occupancy selector hook. */
 export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']>
 
@@ -88,7 +107,7 @@ export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']
  * browsing region drives.
  */
 export type WorkspaceBrowserInjected = {
-  hooks: DirectoryPickingInjected['hooks'] & {
+  hooks: DirectoryPickingInjected['hooks'] & SshHostsInjected['hooks'] & {
     /** Current generation's Host description, bound by the slot renderer. */
     connectionGeneration: ConnectionGenerationState
   }
@@ -135,8 +154,8 @@ export type WorkspaceBrowserInjected = {
    * the Host response/changed frame; failures leave the order unchanged.
    */
   insertSessionBefore: (workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId) => Promise<void>
-  /** Adopt a picked host directory as a real Workspace before targeting a Session. */
-  createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
+  /** Adopt a picked host directory, or an SSH host's anchor, as a real Workspace. */
+  createWorkspace: (input: { path?: string; sshHost?: string }) => Promise<WorkspaceView>
 }
 
 /** Full browser props: shell owner share + viewing store + injected actions + the locale seat. */
@@ -153,9 +172,9 @@ export type WorkspaceBrowserProps =
  * callback; this callback creates only the real Host Workspace. A type alias
  * supplies the implicit index signature required by the registry.
  */
-export type WorkspacePickerInjected = DirectoryPickingInjected & {
-  /** Adopt a picked host directory as a real Workspace before targeting a Session. */
-  createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
+export type WorkspacePickerInjected = DirectoryPickingInjected & SshHostsInjected & {
+  /** Adopt a picked host directory, or an SSH host's anchor, as a real Workspace. */
+  createWorkspace: (input: { path?: string; sshHost?: string }) => Promise<WorkspaceView>
 }
 
 /**
@@ -167,5 +186,5 @@ export type WorkspacePickerProps =
   PropsRuntime<'conversation.hero.workspace'>
   & PropsRenderSlots<'conversation.hero.workspace.directoryFlow'>
   & Omit<WorkspacePickerInjected, 'hooks'>
-  & DirectoryPickingHooks
+  & PropsHooks<WorkspacePickerInjected['hooks']>
   & PropsLocale<'workspace'>

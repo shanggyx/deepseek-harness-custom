@@ -67,7 +67,7 @@ function deferred<T>(): Deferred<T> {
 class FakeWorkspaceRemote implements WorkspaceRemote {
   readonly calls: Array<{ readonly method: string; readonly request: unknown }> = []
   onCreate: (request: WorkspaceCreateRequest) => Promise<RemoteResult<WorkspaceCreateValue>> = request =>
-    Promise.resolve(remoteOk({ workspace: workspace(request.path.split('/').pop() ?? 'workspace'), created: true }))
+    Promise.resolve(remoteOk({ workspace: workspace((request.path ?? 'ssh:' + (request.sshHost ?? 'workspace')).split('/').pop() ?? 'workspace'), created: true }))
   onRename: (request: WorkspaceRenameRequest) => Promise<RemoteResult<WorkspaceValue>> = request =>
     Promise.resolve(remoteOk({ workspace: { ...workspace(String(request.workspaceId)), title: request.title } }))
   onDelete: (_request: WorkspaceDeleteRequest) => Promise<RemoteResult<WorkspaceDeleteValue>> = () =>

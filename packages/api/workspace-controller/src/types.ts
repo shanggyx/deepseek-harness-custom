@@ -72,7 +72,13 @@ export interface DirectoryPickerErrorDetailsMap {
 
 /** Existing directory requested for Workspace adoption. */
 export interface WorkspaceCreateRequest {
-  readonly path: string
+  /** Absolute local directory path; required unless `sshHost` is given. */
+  readonly path?: string
+  /**
+   * Create the Workspace over the SSH host's local anchor directory instead
+   * of a caller-supplied path; exactly one of `path` / `sshHost` is required.
+   */
+  readonly sshHost?: string
 }
 
 /** Created or previously registered Workspace. */

@@ -31,6 +31,10 @@ The base bundle mounts this backend for every profile, so `dsh web`, the desktop
 
 A host carries `name`, `host`, `port` (default 22), `username`, an optional `identityFile`, and an optional `enabled` switch (absent means enabled). Two layers merge by name, the settings section winning: the plugin `config.hosts` (what a deployment ships) and the user's `terminal-ssh` settings document (what the Connections settings page edits). A disabled host stays configured but registers no backend, so `ssh:<name>` is not openable until it is switched back on. Renaming a host replaces its backend under the new type; removing one unregisters it. A duplicate name across layers is one backend — the user layer's value.
 
+### Remote workspaces
+
+Every enabled host also anchors a remote workspace: a real local directory under `~/.dsh/remote-workspaces/<name>` that the workspace registry, sandbox, and persistence treat as an ordinary workspace. Creating a Workspace with `workspace.create { sshHost: <name> }` (the Connections roster feeds the picker) provisions the anchor and registers the workspace; sessions created in it receive a `ssh:workspace` runtime-context clause — logged with the runtime-context snapshot like any prompt clause — directing the agent to work on the remote host through the `ssh:<name>` terminal instead of the local file tools.
+
 ### Configuration
 
 | Field | Default | Meaning |

@@ -19,6 +19,7 @@
     { "path": "../../host/directory-picker" },
     { "path": "../../runtime-diagnostics/invariants" },
     { "path": "../../storage/storage-domain" },
+    { "path": "../../terminal/terminal-ssh" },
     { "path": "../../typert/protocol" },
     { "path": "../../workspace/workspace" }
   ]

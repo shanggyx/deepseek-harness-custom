@@ -887,6 +887,9 @@ importers:
 
   packages/api/workspace-controller:
     dependencies:
+      '@deepseek-ai/dsh-terminal-ssh':
+        specifier: workspace:^
+        version: link:../../terminal/terminal-ssh
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -3761,6 +3764,9 @@ importers:
 
   packages/client/ui-workspace:
     dependencies:
+      '@deepseek-ai/dsh-client-ui-settings':
+        specifier: workspace:^
+        version: link:../ui-settings
       clsx:
         specifier: ^2.0.0
         version: 2.1.1
@@ -9065,9 +9071,15 @@ importers:
 
   packages/terminal/terminal-ssh:
     dependencies:
+      '@deepseek-ai/dsh-home-paths':
+        specifier: workspace:^
+        version: link:../../util/home-paths
       '@deepseek-ai/dsh-settings':
         specifier: workspace:^
         version: link:../../settings/settings
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
       '@deepseek-ai/dsh-terminal-bash':
         specifier: workspace:^
         version: link:../terminal-bash

@@ -84,6 +84,7 @@ function mount(
   items: readonly WorkspaceView[] = [workspace('alpha', 'Alpha')],
   createWorkspace = vi.fn(),
   occupancy = occupancySource(),
+  sshHosts: readonly { name: string; endpoint: string }[] = [],
 ) {
   const onPick = vi.fn()
   const onClose = vi.fn()
@@ -96,6 +97,7 @@ function mount(
       useSessions={hook(sessions)}
       useSessionPendingInteraction={hook(noPendingInteraction)}
       useWorkspaces={hook(workspaceState(nextItems))}
+      useSshHosts={hook(sshHosts)}
       onPick={onPick}
       onClose={onClose}
       createWorkspace={createWorkspace}
@@ -124,6 +126,42 @@ describe('WorkspacePicker', () => {
     expect(entries).toHaveLength(2)
     fireEvent.click(entries[1]!)
     expect(b.onPick).toHaveBeenCalledWith(wid('beta'))
+  })
+
+  it('offers enabled SSH hosts as remote workspace targets and adopts them by name', async () => {
+    const created = { ...workspace('seetacloud'), path: '/home/u/.dsh/remote-workspaces/seetacloud' }
+    const createWorkspace = vi.fn(async () => created)
+    const b = mount([workspace('alpha', 'Alpha')], createWorkspace, occupancySource(), [
+      { name: 'seetacloud', endpoint: 'root@connect.seetacloud.com:26704' },
+    ])
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'seetacloud' }))
+
+    expect(createWorkspace).toHaveBeenCalledWith({ sshHost: 'seetacloud' })
+    await waitFor(() => { expect(b.onPick).toHaveBeenCalledWith(created.workspaceId) })
+  })
+
+  it('keeps offering ssh hosts when no local workspace exists yet', () => {
+    mount([], vi.fn(), occupancySource(), [{ name: 'lab', endpoint: 'root@10.0.0.9:22' }])
+
+    expect(screen.getByRole('menuitem', { name: 'lab' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '添加工作区…' })).toBeTruthy()
+  })
+
+  it('reports an ssh adoption failure in the folder-error surface', async () => {
+    mount(
+      [],
+      vi.fn(async () => { throw new Error('terminal-ssh: no enabled ssh host "ghost"') }),
+      occupancySource(),
+      [{ name: 'ghost', endpoint: 'root@h:1' }],
+    )
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'ghost' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: '无法打开文件夹' })).toBeTruthy()
+    })
+    expect(screen.getByRole('alert').textContent).toBe('terminal-ssh: no enabled ssh host "ghost"')
   })
 
   it('opens the composed directory flow, adopts its picked path, and selects the returned Workspace', async () => {
@@ -216,6 +254,7 @@ describe('WorkspacePicker', () => {
       <WorkspacePicker
         open useSessions={hook(sessions)} useWorkspaces={hook(workspaceState([workspace('alpha', 'Alpha')]))}
         useSessionPendingInteraction={hook(noPendingInteraction)}
+        useSshHosts={hook([])}
         onPick={vi.fn()} onClose={vi.fn()} createWorkspace={vi.fn()}
         useDirectoryFlow={occupancySource().useDirectoryFlow} renderSlot={renderSlot} t={t}
       />,
@@ -232,6 +271,7 @@ describe('WorkspacePicker', () => {
       <WorkspacePicker
         open anchorRef={anchor()} useSessions={hook(sessions)} useWorkspaces={hook(state)}
         useSessionPendingInteraction={hook(noPendingInteraction)}
+        useSshHosts={hook([])}
         onPick={vi.fn()} onClose={vi.fn()} createWorkspace={vi.fn()}
         useDirectoryFlow={occupancySource().useDirectoryFlow} renderSlot={renderSlot} t={t}
       />,

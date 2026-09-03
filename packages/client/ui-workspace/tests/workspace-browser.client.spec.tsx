@@ -84,6 +84,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     insertWorkspaceBefore: vi.fn(async () => {}),
     insertSessionBefore: vi.fn(async () => {}),
     createWorkspace: vi.fn(async () => workspace('created', [])),
+    useSshHosts: selector => selector([]),
     useDirectoryFlow: bindSnapshotSelector({ getSnapshot: () => true, subscribe: () => () => {} }),
     useConnectionGeneration: selector => selector(undefined),
     renderSlot: ((_name: string, owner: { open: boolean }) => (owner.open ? <div data-testid="directory-flow" /> : null)) as never,
@@ -902,6 +903,7 @@ describe('WorkspaceBrowser', () => {
   it('hides the add button when no directory-flow occupant is composed', () => {
     mount({
       useWorkspaces: hook(workspaceState([workspace('alpha', [])])),
+      useSshHosts: selector => selector([]),
       useDirectoryFlow: bindSnapshotSelector({ getSnapshot: () => false, subscribe: () => () => {} }),
     })
     // Nothing to add with, so the header offers no dead button.

@@ -9,6 +9,8 @@ import {
   WorkspaceUnknownSessionError,
 } from '@deepseek-ai/dsh-workspace'
 import { TypertRemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
+// Type-only: pulls the `sshWorkspace` Context merge owned by terminal-ssh.
+import type {} from '@deepseek-ai/dsh-terminal-ssh'
 import { workspaceView } from './feed.ts'
 import type {
   WorkspaceArchiveSessionRequest,
@@ -32,28 +34,60 @@ export class WorkspaceCommands {
   constructor(private readonly ctx: Context) {}
 
   /**
-   * Create or resolve one Workspace over an existing directory.
-   * @param request - directory path to register.
+   * Create or resolve one Workspace over an existing directory — caller
+   * supplied, or the local anchor of an SSH host's remote workspace.
+   * @param request - directory path, or an SSH host roster name.
    * @returns the Workspace and whether this call created it.
    */
   create(request: WorkspaceCreateRequest): Promise<WorkspaceCreateValue> {
     return this.enqueue(async () => {
-      try {
-        const existing = await this.ctx.workspaceRegistry.resolveByPath(request.path)
-        if (existing !== undefined) {
-          return { workspace: workspaceView(existing), created: false }
-        }
-        const workspace = await this.ctx.workspaceRegistry.create(request.path)
-        return { workspace: workspaceView(workspace), created: true }
-      } catch (error) {
-        if (error instanceof TypertRemoteFailure) throw error
-        throw failure(
-          'workspace-invalid-path',
-          `cannot create a Workspace at "${request.path}": ${errorMessage(error)}`,
-          { path: request.path },
-        )
+      if (request.sshHost !== undefined && request.path !== undefined) {
+        throw failure('bad-request', 'Workspace create takes "path" or "sshHost", not both', {})
       }
+      if (request.sshHost !== undefined) {
+        const anchors = this.ctx.get('sshWorkspace')
+        if (anchors === undefined) {
+          throw failure(
+            'ssh-workspace-unavailable',
+            'this deployment does not compose the SSH terminal backend',
+            { sshHost: request.sshHost },
+          )
+        }
+        try {
+          return await this.createAt(await anchors.anchorOf(request.sshHost))
+        } catch (error) {
+          if (error instanceof TypertRemoteFailure) throw error
+          throw failure(
+            'ssh-host-unknown',
+            `cannot anchor a Workspace on ${JSON.stringify(request.sshHost)}: ${errorMessage(error)}`,
+            { sshHost: request.sshHost },
+          )
+        }
+      }
+      if (request.path === undefined) {
+        throw failure('bad-request', 'Workspace create requires a "path" or an "sshHost"', {})
+      }
+      return this.createAt(request.path)
     })
+  }
+
+  /** Create or idempotently resolve one Workspace at a local directory. */
+  private async createAt(path: string): Promise<WorkspaceCreateValue> {
+    try {
+      const existing = await this.ctx.workspaceRegistry.resolveByPath(path)
+      if (existing !== undefined) {
+        return { workspace: workspaceView(existing), created: false }
+      }
+      const workspace = await this.ctx.workspaceRegistry.create(path)
+      return { workspace: workspaceView(workspace), created: true }
+    } catch (error) {
+      if (error instanceof TypertRemoteFailure) throw error
+      throw failure(
+        'workspace-invalid-path',
+        `cannot create a Workspace at "${path}": ${errorMessage(error)}`,
+        { path },
+      )
+    }
   }
 
   /**

@@ -13,6 +13,7 @@ import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { IWorkspaces, WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the Controller service merges.
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -22,7 +23,9 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the Session root standard-hook merge.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
-import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from './contract/slots.ts'
+// Type-only: pulls the settingsScope Context merge.
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { SshWorkspaceHost, WorkspaceBrowserInjected, WorkspacePickerInjected } from './contract/slots.ts'
 import { UiWorkspaceService } from './navigation.ts'
 import { createWorkspaceViewStore } from './stores.ts'
 import { WorkspaceBrowser } from './rows/WorkspaceBrowser.tsx'
@@ -32,7 +35,7 @@ import { en, zh, type WorkspaceKey } from './locales.ts'
 export type { UiWorkspace } from './navigation.ts'
 export type {
   DirectoryFlowOwnerProps, DirectoryFlowSlotName, DirectoryPickingHooks, DirectoryPickingInjected,
-  WorkspaceBrowserInjected, WorkspaceBrowserProps, WorkspacePickerInjected, WorkspacePickerProps,
+  SshWorkspaceHost, WorkspaceBrowserInjected, WorkspaceBrowserProps, WorkspacePickerInjected, WorkspacePickerProps,
 } from './contract/slots.ts'
 export type { WorkspaceKey } from './locales.ts'
 
@@ -60,7 +63,7 @@ const NS = 'workspace'
  * declaration through `slots.inject()` instead of assuming order.
  */
 export const inject = [
-  'slots', 'sessions', 'workspaces', 'locale', 'connection', 'remote', 'remote.directoryPicker',
+  'slots', 'sessions', 'workspaces', 'locale', 'connection', 'remote', 'remote.directoryPicker', 'settingsScope',
 ]
 
 /**
@@ -91,6 +94,40 @@ export function apply(ctx: Context): void {
     getSnapshot: () => ctx.slots.entries(hole).length > 0,
     subscribe: listener => ctx.slots.subscribe(hole, listener),
   })
+  // Enabled hosts of the served `terminal-ssh` roster, projected for the pick
+  // menu. An unserved namespace (no SSH terminal composed) projects to [] —
+  // the menu simply offers no remote targets. The namespace shape is spelled
+  // here rather than imported: a client package must not depend on a Host
+  // package, and ui-settings-connections spells the same value for its card.
+  const sshScope: SettingsScope<{ hosts?: Array<{
+    name: string
+    host: string
+    port: number
+    username: string
+    enabled?: boolean
+  }> }> = ctx.settingsScope.bind({ namespace: 'terminal-ssh' })
+  let sshSignature = ''
+  let sshHosts: readonly SshWorkspaceHost[] = []
+  const sshHostsSource: HostObservable<readonly SshWorkspaceHost[]> = {
+    getSnapshot: () => {
+      const snapshot = sshScope.getSnapshot()
+      if (snapshot.status !== 'ready') return sshHosts
+      const rows = snapshot.value?.hosts ?? []
+      const signature = rows
+        .map(row => `${row.name}\u0000${row.username}@${row.host}:${String(row.port)}\u0000${String(row.enabled !== false)}`)
+        .join('\u0001')
+      if (signature === sshSignature) return sshHosts
+      sshSignature = signature
+      sshHosts = rows
+        .filter(row => row.enabled !== false && row.name.length > 0)
+        .map(row => ({
+          name: row.name,
+          endpoint: `${row.username}@${row.host}:${String(row.port)}`,
+        }))
+      return sshHosts
+    },
+    subscribe: listener => sshScope.subscribe(listener),
+  }
   const browserFlowSource = flowSource('sidebar.workspaces.directoryFlow')
   const pickerFlowSource = flowSource('conversation.hero.workspace.directoryFlow')
   const browserInjected = (): WorkspaceBrowserInjected => ({
@@ -125,11 +162,11 @@ export function apply(ctx: Context): void {
       await workspaces.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     },
     createWorkspace: input => workspaces.create(input),
-    hooks: { directoryFlow: browserFlowSource, connectionGeneration },
+    hooks: { directoryFlow: browserFlowSource, connectionGeneration, sshHosts: sshHostsSource },
   })
   const pickerInjected = (): WorkspacePickerInjected => ({
     createWorkspace: input => workspaces.create(input),
-    hooks: { directoryFlow: pickerFlowSource },
+    hooks: { directoryFlow: pickerFlowSource, sshHosts: sshHostsSource },
   })
   // Each registration declares its directory-flow child in the same call;
   // slot injection follows both the owner and declaration HMR lifetimes.

@@ -71,9 +71,29 @@ async function bench() {
   // comes from FALLBACK_LOCALE (en): state the asserted locale explicitly.
   locale.setLocale('zh')
   ctx.provide('locale', locale)
+  // The `terminal-ssh` scope the picker's remote-host section projects; tests
+  // drive roster hosts through setSshHosts.
+  let sshSnapshot: { status: 'unavailable' | 'ready'; value?: { hosts?: Array<Record<string, unknown>> } } = {
+    status: 'unavailable',
+  }
+  const sshListeners = new Set<() => void>()
+  const settingsScope = {
+    bind: () => ({
+      getSnapshot: () => sshSnapshot,
+      subscribe: (listener: () => void) => {
+        sshListeners.add(listener)
+        return () => { sshListeners.delete(listener) }
+      },
+    }),
+  }
+  ctx.provide('settingsScope', settingsScope as never)
   return {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, rename,
     insertSessionBefore, open, clear, search, renameSession, binding, fork, pickDirectory,
+    setSshHosts: (hosts: Array<Record<string, unknown>>) => {
+      sshSnapshot = { status: 'ready', value: { hosts } }
+      for (const listener of [...sshListeners]) listener()
+    },
   }
 }
 
@@ -88,7 +108,7 @@ function declare(slots: SlotRegistry, ...names: HoleName[]): () => void {
 describe('ui-workspace apply', () => {
   it('declares the services it drives', () => {
     expect(inject).toEqual([
-      'slots', 'sessions', 'workspaces', 'locale', 'connection', 'remote', 'remote.directoryPicker',
+      'slots', 'sessions', 'workspaces', 'locale', 'connection', 'remote', 'remote.directoryPicker', 'settingsScope',
     ])
   })
 
@@ -188,6 +208,29 @@ describe('ui-workspace apply', () => {
     const browser = (b.slots.entries('sidebar.workspaces')[0]!.inject as () => WorkspaceBrowserInjected)()
     await expect(browser.searchSessions('needle', new AbortController().signal))
       .rejects.toThrow('index unavailable')
+  })
+
+  it('projects the served ssh roster to enabled hosts on both surfaces', async () => {
+    const b = await bench()
+    declare(b.slots, 'sidebar.workspaces', 'conversation.hero.workspace')
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const browser = (b.slots.entries('sidebar.workspaces')[0]!.inject as () => WorkspaceBrowserInjected)()
+    const picker = (b.slots.entries('conversation.hero.workspace')[0]!.inject as () => WorkspacePickerInjected)()
+    // Unserved namespace: no remote targets.
+    expect(browser.hooks.sshHosts.getSnapshot()).toEqual([])
+    expect(picker.hooks.sshHosts.getSnapshot()).toEqual([])
+
+    b.setSshHosts([
+      { name: 'seetacloud', host: 'connect.seetacloud.com', port: 26704, username: 'root' },
+      { name: 'off', host: 'h', port: 22, username: 'root', enabled: false },
+      { name: '', host: 'h', port: 22, username: 'root' },
+    ])
+    expect(browser.hooks.sshHosts.getSnapshot()).toEqual([
+      { name: 'seetacloud', endpoint: 'root@connect.seetacloud.com:26704' },
+    ])
+    expect(picker.hooks.sshHosts.getSnapshot()).toEqual([
+      { name: 'seetacloud', endpoint: 'root@connect.seetacloud.com:26704' },
+    ])
   })
 
   it('unregisters every entry on teardown', async () => {
